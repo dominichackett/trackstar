@@ -1,0 +1,43 @@
+.container {
+  padding: 2rem;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+  color: var(--trackstar-red);
+}
+
+.analysisContainer {
+  background-color: #1a1a1a;
+  padding: 2rem;
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+.analysisTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.analysisTable th, .analysisTable td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #333;
+}
+
+.analysisTable th {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #aaa;
+}
+
+.analysisTable td {
+  font-size: 1rem;
+  color: #fff;
+}
+
+.analysisTable tbody tr:hover {
+  background-color: #2a2a2a;
+}

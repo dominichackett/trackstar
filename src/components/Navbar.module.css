@@ -1,0 +1,39 @@
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid #333;
+}
+
+.logo a {
+  display: flex;
+  align-items: center;
+}
+
+.navLinks {
+  display: flex;
+  gap: 2rem;
+}
+
+.navLink {
+  color: var(--trackstar-white);
+  text-decoration: none;
+  font-weight: 500;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+
+.navLink:hover {
+  color: var(--trackstar-red);
+}
+
+.navLink.active {
+  color: var(--trackstar-red);
+  border-bottom-color: var(--trackstar-red);
+}
+
+.userProfile {
+  cursor: pointer;
+}

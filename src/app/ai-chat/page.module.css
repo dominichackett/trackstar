@@ -1,0 +1,138 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 1rem;
+  background-color: #121212;
+  color: #e0e0e0;
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--trackstar-red);
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.chatWindow {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #1e1e1e;
+  border-radius: 8px;
+  border: 1px solid #333;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.chatHistory {
+  flex-grow: 1;
+  padding: 1rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.message {
+  padding: 0.75rem 1rem;
+  border-radius: 20px;
+  max-width: 70%;
+  word-wrap: break-word;
+}
+
+.user {
+  align-self: flex-end;
+  background-color: var(--trackstar-red);
+  color: white;
+  border-bottom-right-radius: 5px;
+}
+
+.ai {
+  align-self: flex-start;
+  background-color: #333;
+  color: white;
+  border-bottom-left-radius: 5px;
+}
+
+.chatInputArea {
+  display: flex;
+  padding: 1rem;
+  border-top: 1px solid #333;
+  background-color: #2a2a2a;
+}
+
+.chatInput {
+  flex-grow: 1;
+  padding: 0.75rem 1rem;
+  border: 1px solid #555;
+  border-radius: 20px;
+  background-color: #3a3a3a;
+  color: #e0e0e0;
+  margin-right: 0.5rem;
+}
+
+.chatInput:focus {
+  outline: none;
+  border-color: var(--trackstar-red);
+}
+
+.sendButton,
+.voiceButton,
+.actionButton {
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-radius: 20px;
+  background-color: var(--trackstar-red);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+  margin-left: 0.5rem;
+}
+
+.sendButton:hover,
+.voiceButton:hover,
+.actionButton:hover {
+  background-color: #ff4d4d; /* A slightly lighter red */
+}
+
+.voiceButton.listening {
+  background-color: #4CAF50; /* Green when listening */
+}
+
+.voiceButton.listening:hover {
+  background-color: #66BB6A;
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1rem;
+  margin-top: 1rem;
+}
+
+.historyPlaceholder {
+  background-color: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1rem;
+  width: 30%; /* Adjust as needed */
+}
+
+.historyPlaceholder h3 {
+  color: #e0e0e0;
+  margin-bottom: 0.5rem;
+}
+
+.historyPlaceholder ul {
+  list-style: none;
+  padding: 0;
+}
+
+.historyPlaceholder li {
+  padding: 0.25rem 0;
+  color: #aaa;
+}
