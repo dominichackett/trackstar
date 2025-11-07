@@ -27,6 +27,7 @@
 
 .navLink:hover {
   color: var(--trackstar-red);
+  cursor: pointer;
 }
 
 .navLink.active {

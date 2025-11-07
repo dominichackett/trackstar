@@ -1,18 +1,24 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import styles from './page.module.css';
 
-export default function LoginPage() {
+export default function LandingPage() {
   return (
     <div className={styles.container}>
-      <div className={styles.loginBox}>
-        <div className={styles.logoContainer}>
-          <Image src="/trackstar-logo.svg" alt="Trackstar Logo" width={300} height={80} />
+      <div className={styles.heroSection}>
+        <Image src="/trackstar-logo.svg" alt="Trackstar Logo" width={400} height={100} />
+        <h1 className={styles.tagline}>Your Ultimate Race Data Companion</h1>
+        <p className={styles.description}>
+          Analyze your race telemetry, track driver performance, and relive every lap.
+        </p>
+        <div className={styles.ctaButtons}>
+          <Link href="/register" className={styles.registerButton}>
+            Sign Up
+          </Link>
+          <Link href="/login" className={styles.loginButton}>
+            Login
+          </Link>
         </div>
-        <form className={styles.loginForm}>
-          <input type="text" placeholder="Username" className={styles.inputField} />
-          <input type="password" placeholder="Password" className={styles.inputField} />
-          <button type="submit" className={styles.loginButton}>Login</button>
-        </form>
       </div>
     </div>
   );

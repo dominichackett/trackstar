@@ -1,0 +1,95 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+  background-color: #121212;
+  color: #e0e0e0;
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--trackstar-red);
+  margin-bottom: 2rem;
+}
+
+.form {
+  background-color: #1e1e1e;
+  border-radius: 8px;
+  border: 1px solid #333;
+  padding: 2rem;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.formGroup label {
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  color: #aaa;
+}
+
+.input {
+  padding: 0.75rem 1rem;
+  border: 1px solid #555;
+  border-radius: 5px;
+  background-color: #3a3a3a;
+  color: #e0e0e0;
+  font-size: 1rem;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--trackstar-red);
+}
+
+.button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 5px;
+  background-color: var(--trackstar-red);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.button:disabled {
+  background-color: #555;
+  cursor: not-allowed;
+}
+
+.button:hover:not(:disabled) {
+  background-color: #ff4d4d;
+}
+
+.error {
+  color: #dc3545;
+  margin-top: -1rem;
+  text-align: center;
+}
+
+.loginLink {
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.loginLink a {
+  color: var(--trackstar-red);
+  text-decoration: none;
+}
+
+.loginLink a:hover {
+  text-decoration: underline;
+}

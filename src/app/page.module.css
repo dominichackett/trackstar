@@ -1,54 +1,68 @@
 .container {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  align-items: center;
   min-height: 100vh;
-  background-color: var(--trackstar-black);
+  background-color: #121212;
+  color: #e0e0e0;
+  text-align: center;
+  padding: 2rem;
 }
 
-.loginBox {
+.heroSection {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 3rem;
-  background-color: #1a1a1a;
-  border-radius: 10px;
-  border: 1px solid #333;
+  gap: 1.5rem;
 }
 
-.logoContainer {
-  margin-bottom: 2rem;
+.tagline {
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--trackstar-red);
+  margin-top: 1rem;
 }
 
-.loginForm {
+.description {
+  font-size: 1.2rem;
+  max-width: 600px;
+  line-height: 1.5;
+}
+
+.ctaButtons {
   display: flex;
-  flex-direction: column;
-  width: 100%;
+  gap: 1.5rem;
+  margin-top: 2rem;
 }
 
-.inputField {
-  width: 300px;
-  padding: 0.8rem;
-  margin-bottom: 1rem;
-  background-color: #333;
-  border: 1px solid #555;
-  color: var(--trackstar-white);
+.registerButton,
+.loginButton {
+  padding: 1rem 2rem;
+  border: none;
   border-radius: 5px;
-  font-size: 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+  text-decoration: none; /* Remove underline from Link */
+}
+
+.registerButton {
+  background-color: var(--trackstar-red);
+  color: white;
+}
+
+.registerButton:hover {
+  background-color: #ff4d4d;
 }
 
 .loginButton {
-  background-color: var(--trackstar-red);
-  color: var(--trackstar-white);
-  border: none;
-  padding: 0.8rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.2s ease-in-out;
+  background-color: #333;
+  color: white;
+  border: 1px solid #555;
 }
 
 .loginButton:hover {
-  background-color: var(--trackstar-red-dark);
+  background-color: #555;
 }
