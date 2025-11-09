@@ -66,20 +66,41 @@ const main = async () => {
       return null;
     }
 
+    let rowData;
+    if (raceNumberArg === '1') {
+      rowData = {
+        class_type: row.CLASS_TYPE,
+        position: parseInt(row.POS, 10),
+        position_in_class: parseInt(row.PIC, 10),
+        vehicle: row.VEHICLE,
+        laps: parseInt(row.LAPS, 10),
+        elapsed_time: row.ELAPSED || null,
+        gap_to_first: parseInterval(row.GAP_FIRST),
+        gap_to_previous: parseInterval(row.GAP_PREVIOUS),
+        best_lap_number: parseInt(row.BEST_LAP_NUM, 10),
+        best_lap_time: row.BEST_LAP_TIME || null,
+        best_lap_speed_kph: parseFloat(row.BEST_LAP_KPH),
+      };
+    } else { // raceNumberArg === '2'
+      rowData = {
+        class_type: row.CLASS,
+        position: parseInt(row.POSITION, 10),
+        position_in_class: null, // Not available in Race 2 data
+        vehicle: row.VEHICLE,
+        laps: parseInt(row.LAPS, 10),
+        elapsed_time: row.TOTAL_TIME || null,
+        gap_to_first: parseInterval(row.GAP_FIRST),
+        gap_to_previous: parseInterval(row.GAP_PREVIOUS),
+        best_lap_number: parseInt(row.FL_LAPNUM, 10),
+        best_lap_time: row.FL_TIME || null,
+        best_lap_speed_kph: parseFloat(row.FL_KPH),
+      };
+    }
+
     return {
       race_id: race.id,
       driver_id: driver.id,
-      class_type: row.CLASS_TYPE,
-      position: parseInt(row.POS, 10),
-      position_in_class: parseInt(row.PIC, 10),
-      vehicle: row.VEHICLE,
-      laps: parseInt(row.LAPS, 10),
-      elapsed_time: row.ELAPSED || null,
-      gap_to_first: parseInterval(row.GAP_FIRST),
-      gap_to_previous: parseInterval(row.GAP_PREVIOUS),
-      best_lap_number: parseInt(row.BEST_LAP_NUM, 10),
-      best_lap_time: row.BEST_LAP_TIME || null,
-      best_lap_speed_kph: parseFloat(row.BEST_LAP_KPH),
+      ...rowData,
     };
   }).filter(Boolean); // Filter out any null rows
 
