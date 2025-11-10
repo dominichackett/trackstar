@@ -1,0 +1,21 @@
+.loadingIndicator,
+.noDataIndicator,
+.errorIndicator {
+  text-align: center;
+  padding: 1rem;
+  font-style: italic;
+  color: #aaa;
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.errorIndicator {
+  color: var(--trackstar-red);
+}
+
+.loadingIndicator {
+  color: var(--trackstar-red);
+  font-weight: bold;
+}

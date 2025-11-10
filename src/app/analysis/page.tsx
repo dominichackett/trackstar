@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import styles from './page.module.css';
 import 'leaflet/dist/leaflet.css';
+import StatusIndicator from '@/components/StatusIndicator';
 import { getSupabaseClient } from '@/utils/supabase/client';
 
 interface Race {
@@ -41,6 +42,7 @@ export default function AnalysisPage() {
   const [pageInput, setPageInput] = useState('');
   const itemsPerPage = 40;
   const [loadingTelemetry, setLoadingTelemetry] = useState<boolean>(false);
+  const [errorTelemetry, setErrorTelemetry] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRaces = async () => {
@@ -135,10 +137,12 @@ export default function AnalysisPage() {
         setRaceLinesForMap({});
         setProcessedTelemetryForTable([]); // Clear table data
         setLoadingTelemetry(false); // Ensure loading is false if conditions not met
+        setErrorTelemetry(null); // Clear errors
         return;
       }
 
       setLoadingTelemetry(true); // Set loading to true
+      setErrorTelemetry(null); // Clear previous errors
       const driverIdToNumberMap = new Map(driversList.map(d => [d.id, d.number]));
 
       let query = supabase
@@ -154,6 +158,8 @@ export default function AnalysisPage() {
      
       if (error) {
         console.error('Error fetching telemetry:', error);
+        setErrorTelemetry(error.message);
+        setProcessedTelemetryForTable([]); // Clear data on error
         setLoadingTelemetry(false); // Set loading to false on error
         return;
       }
@@ -375,6 +381,14 @@ export default function AnalysisPage() {
       <div className={styles.header}>
         <h1 className={styles.pageTitle}>Race Analysis</h1>
       </div>
+      <StatusIndicator
+        loading={loadingTelemetry}
+        error={errorTelemetry}
+        data={processedTelemetryForTable}
+        loadingMessage="Loading telemetry data..."
+        errorMessage={errorTelemetry || "An error occurred."}
+        noDataMessage="No telemetry data found for the selected lap and driver."
+      />
       <div className={styles.selectors}>
           <div className={styles.selectorGroup}>
             <label htmlFor="year-select">Select Year:</label>
@@ -633,16 +647,7 @@ export default function AnalysisPage() {
               </tr>
             </thead>
             <tbody>
-              {loadingTelemetry ? (
-                <tr>
-                  <td colSpan={13} className={styles.loadingIndicator}>Loading telemetry data...</td>
-                </tr>
-              ) : processedTelemetryForTable.length === 0 ? (
-                <tr>
-                  <td colSpan={13} className={styles.noDataIndicator}>No telemetry data found for the selected lap and driver.</td>
-                </tr>
-              ) : (
-                paginatedData.map((dataPoint, index) => {
+              {paginatedData.map((dataPoint, index) => {
                   const driver = driversList.find(d => d.id === selectedDriver);
                   const driverNumber = driver ? driver.number : null;
                   if (!driverNumber) return null;
@@ -664,8 +669,7 @@ export default function AnalysisPage() {
                       <td>{dataPoint[`${driverNumber}_VBOX_Lat_Min`]?.toFixed(6)}</td>
                     </tr>
                   );
-                })
-              )}
+                })}
             </tbody>
           </table>
           <div className={styles.paginationControls}>

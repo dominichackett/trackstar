@@ -229,12 +229,18 @@
 }
 
 .loadingIndicator,
-.noDataIndicator {
+.noDataIndicator,
+.errorIndicator {
   text-align: center;
   padding: 1rem;
   font-style: italic;
   color: #aaa;
 }
+
+.errorIndicator {
+  color: var(--trackstar-red);
+}
+
 
 .loadingIndicator {
   color: var(--trackstar-red);
