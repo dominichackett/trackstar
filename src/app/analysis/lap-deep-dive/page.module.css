@@ -98,3 +98,45 @@
 .button:hover {
   background-color: var(--trackstar-red-dark);
 }
+
+.lapResultsTable {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  background-color: #1a1a1a;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.table th,
+.table td {
+  padding: 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid #333;
+  color: var(--trackstar-white);
+}
+
+.table th {
+  background-color: #333;
+  font-weight: 600;
+  color: var(--trackstar-red);
+}
+
+.table tbody tr:hover {
+  background-color: #2a2a2a;
+}
+
+.selectedLap {
+  background-color: #4a2a2a; /* A slightly different background for the selected lap */
+  font-weight: 600;
+}
+
+.selectedLap td {
+  color: var(--trackstar-red);
+}

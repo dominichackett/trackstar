@@ -1,257 +1,411 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect ,Fragment} from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import styles from './page.module.css';
 import 'leaflet/dist/leaflet.css';
+import { getSupabaseClient } from '@/utils/supabase/client';
 
-const Map = dynamic(() => import('../../components/Map'), { ssr: false });
+interface Race {
+  id: string;
+  name: string;
+}
 
-const availableDrivers = [
-  { id: 'driver1', name: 'Driver A', color: '#E30613' },
-  { id: 'driver2', name: 'Driver B', color: '#FFFFFF' },
-  { id: 'driver3', name: 'Driver C', color: '#00FF00' },
-  { id: 'driver4', name: 'Driver D', color: '#00FFFF' },
-  { id: 'driver5', name: 'Driver E', color: '#FF00FF' },
-  { id: 'driver6', name: 'Driver F', color: '#FFFF00' },
-  { id: 'driver7', name: 'Driver G', color: '#800000' },
-  { id: 'driver8', name: 'Driver H', color: '#008000' },
-  { id: 'driver9', name: 'Driver I', color: '#000080' },
-  { id: 'driver10', name: 'Driver J', color: '#808000' },
-];
-
-const allRaceData = {
-  race1: {
-    lap1: {
-      drivers: {
-        driver1: {
-          speed: [
-            { distance: 0, value: 100 }, { distance: 100, value: 110 }, { distance: 200, value: 120 },
-            { distance: 300, value: 125 }, { distance: 400, value: 130 },
-          ],
-          throttle: [
-            { distance: 0, value: 80 }, { distance: 100, value: 85 }, { distance: 200, value: 90 },
-            { distance: 300, value: 92 }, { distance: 400, value: 95 },
-          ],
-          brake: [
-            { distance: 0, value: 0 }, { distance: 100, value: 0 }, { distance: 200, value: 10 },
-            { distance: 300, value: 5 }, { distance: 400, value: 2 },
-          ],
-          raceLines: [
-            [33.589, -86.795], [33.590, -86.796], [33.591, -86.797],
-            [33.592, -86.798], [33.593, -86.799],
-          ],
-        },
-        driver2: {
-          speed: [
-            { distance: 0, value: 102 }, { distance: 100, value: 112 }, { distance: 200, value: 122 },
-            { distance: 300, value: 128 }, { distance: 400, value: 132 },
-          ],
-          throttle: [
-            { distance: 0, value: 82 }, { distance: 100, value: 87 }, { distance: 200, value: 92 },
-            { distance: 300, value: 94 }, { distance: 400, value: 97 },
-          ],
-          brake: [
-            { distance: 0, value: 0 }, { distance: 100, value: 0 }, { distance: 200, value: 12 },
-            { distance: 300, value: 7 }, { distance: 400, value: 3 },
-          ],
-          raceLines: [
-            [33.5895, -86.7955], [33.5905, -86.7965], [33.5915, -86.7975],
-            [33.5925, -86.7985], [33.5935, -86.7995],
-          ],
-        },
-        driver3: {
-          speed: [
-            { distance: 0, value: 95 }, { distance: 100, value: 105 }, { distance: 200, value: 115 },
-            { distance: 300, value: 120 }, { distance: 400, value: 125 },
-          ],
-          throttle: [
-            { distance: 0, value: 75 }, { distance: 100, value: 80 }, { distance: 200, value: 85 },
-            { distance: 300, value: 88 }, { distance: 400, value: 90 },
-          ],
-          brake: [
-            { distance: 0, value: 8 }, { distance: 100, value: 10 }, { distance: 200, value: 18 },
-            { distance: 300, value: 12 }, { distance: 400, value: 6 },
-          ],
-          raceLines: [
-            [33.589, -86.794], [33.590, -86.795], [33.591, -86.796],
-            [33.592, -86.797], [33.593, -86.798],
-          ],
-        },
-      },
-    },
-    lap2: {
-      drivers: {
-        driver1: {
-          speed: [
-            { distance: 0, value: 98 }, { distance: 100, value: 108 }, { distance: 200, value: 118 },
-            { distance: 300, value: 125 }, { distance: 400, value: 130 },
-          ],
-          throttle: [
-            { distance: 0, value: 78 }, { distance: 100, value: 83 }, { distance: 200, value: 88 },
-            { distance: 300, value: 92 }, { distance: 400, value: 95 },
-          ],
-          brake: [
-            { distance: 0, value: 5 }, { distance: 100, value: 8 }, { distance: 200, value: 15 },
-            { distance: 300, value: 7 }, { distance: 400, value: 2 },
-          ],
-          raceLines: [
-            [33.588, -86.794], [33.589, -86.795], [33.590, -86.796],
-            [33.591, -86.797], [33.592, -86.798],
-          ],
-        },
-        driver2: {
-          speed: [
-            { distance: 0, value: 100 }, { distance: 100, value: 110 }, { distance: 200, value: 120 },
-            { distance: 300, value: 128 }, { distance: 400, value: 132 },
-          ],
-          throttle: [
-            { distance: 0, value: 80 }, { distance: 100, value: 85 }, { distance: 200, value: 90 },
-            { distance: 300, value: 94 }, { distance: 400, value: 97 },
-          ],
-          brake: [
-            { distance: 0, value: 3 }, { distance: 100, value: 6 }, { distance: 200, value: 13 },
-            { distance: 300, value: 5 }, { distance: 400, value: 1 },
-          ],
-          raceLines: [
-            [33.5885, -86.7945], [33.5895, -86.7955], [33.5905, -86.7965],
-            [33.5915, -86.7975], [33.5925, -86.7985],
-          ],
-        },
-      },
-    },
-  },
-  race2: {
-    lap1: {
-      drivers: {
-        driver1: {
-          speed: [
-            { distance: 0, value: 105 }, { distance: 100, value: 115 }, { distance: 200, value: 125 },
-            { distance: 300, value: 130 }, { distance: 400, value: 135 },
-          ],
-          throttle: [
-            { distance: 0, value: 85 }, { distance: 100, value: 90 }, { distance: 200, value: 95 },
-            { distance: 300, value: 98 }, { distance: 400, value: 100 },
-          ],
-          brake: [
-            { distance: 0, value: 2 }, { distance: 100, value: 5 }, { distance: 200, value: 12 },
-            { distance: 300, value: 8 }, { distance: 400, value: 3 },
-          ],
-          raceLines: [
-            [33.590, -86.796], [33.591, -86.797], [33.592, -86.798],
-            [33.593, -86.799], [33.594, -86.800],
-          ],
-        },
-        driver2: {
-          speed: [
-            { distance: 0, value: 103 }, { distance: 100, value: 113 }, { distance: 200, value: 123 },
-            { distance: 300, value: 127 }, { distance: 400, value: 130 },
-          ],
-          throttle: [
-            { distance: 0, value: 83 }, { distance: 100, value: 88 }, { distance: 200, value: 93 },
-            { distance: 300, value: 96 }, { distance: 400, value: 98 },
-          ],
-          brake: [
-            { distance: 0, value: 4 }, { distance: 100, value: 7 }, { distance: 200, value: 14 },
-            { distance: 300, value: 10 }, { distance: 400, value: 5 },
-          ],
-          raceLines: [
-            [33.5905, -86.7965], [33.5915, -86.7975], [33.5925, -86.7985],
-            [33.5935, -86.7995], [33.5945, -86.8005],
-          ],
-        },
-      },
-    },
-  },
-};
+const RaceMap = dynamic(() => import('../../components/Map'), { ssr: false });
 
 export default function AnalysisPage() {
-  const [selectedRace, setSelectedRace] = useState('race1');
-  const [selectedLap, setSelectedLap] = useState('lap1');
-  const [selectedDrivers, setSelectedDrivers] = useState(['driver1', 'driver2']);
+  const supabase = getSupabaseClient();
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: currentYear - 1974 + 1 }, (_, i) => currentYear - i);
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [racesList, setRacesList] = useState<Race[]>([]);
+  const [loadingRaces, setLoadingRaces] = useState<boolean>(true);
+  const [errorRaces, setErrorRaces] = useState<string | null>(null);
+  const [selectedRace, setSelectedRace] = useState<string>('');
+  const [selectedLap, setSelectedLap] = useState<string>('');
+  const [selectedDriver, setSelectedDriver] = useState<string>('');
+  const [lapsList, setLapsList] = useState<number[]>([]);
+  const [driversList, setDriversList] = useState<{ id: string; name: string; number: number; }[]>([]);
+  const [telemetryData, setTelemetryData] = useState({
+    speed: [],
+    rpm: [],
+    throttleBrake: [],
+    accelerationSteering: [],
+  });
+  const [processedTelemetryForTable, setProcessedTelemetryForTable] = useState<any[]>([]);
+  const [raceLinesForMap, setRaceLinesForMap] = useState({});
+  const [speedRange, setSpeedRange] = useState<{min: number, max: number}>({min: 0, max: 0});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageInput, setPageInput] = useState('');
+  const itemsPerPage = 40;
+  const [loadingTelemetry, setLoadingTelemetry] = useState<boolean>(false);
 
-  const currentRaceData = allRaceData[selectedRace];
-  const currentLapData = currentRaceData[selectedLap];
+  useEffect(() => {
+    const fetchRaces = async () => {
+      console.log('Fetching races for year:', selectedYear);
+      setLoadingRaces(true);
+      setErrorRaces(null);
+      setRacesList([]);
 
-  const handleDriverChange = (event) => {
-    const { options } = event.target;
-    const value = [];
-    for (let i = 0, l = options.length; i < l; i++) {
-      if (options[i].selected) {
-        value.push(options[i].value);
+      const { data, error } = await supabase
+        .from('races')
+        .select('id, name')
+        .gte('date', `${selectedYear}-01-01`)
+        .lt('date', `${selectedYear + 1}-01-01`)
+        .order('date', { ascending: false });
+
+      console.log('Supabase response:', { data, error });
+
+      if (error) {
+        console.error('Error fetching races:', error);
+        setErrorRaces(error.message);
+      } else {
+        const races = data || [];
+        console.log('Setting races:', races);
+        setRacesList(races);
+        if (races.length > 0) {
+          console.log('Setting selected race:', races[0].id);
+          setSelectedRace(races[0].id);
+        } else {
+          console.log('No races found, setting selected race to empty string');
+          setSelectedRace('');
+        }
+      }
+      setLoadingRaces(false);
+    };
+
+    fetchRaces();
+  }, [selectedYear, supabase]);
+
+  useEffect(() => {
+    const fetchLapsAndDrivers = async () => {
+      if (!selectedRace) return;
+
+      const { data: lapsData, error: lapsError } = await supabase
+        .from('lap_events')
+        .select('lap_number')
+        .eq('race_id', selectedRace)
+        .order('lap_number', { ascending: true });
+
+      if (lapsError) {
+        console.error('Error fetching laps:', lapsError);
+      } else {
+        const distinctLaps = [...new Set(lapsData.map(l => l.lap_number))];
+        setLapsList(distinctLaps);
+        if (distinctLaps.length > 0) {
+          setSelectedLap(distinctLaps[0].toString());
+        }
+      }
+
+      const { data: driversData, error: driversError } = await supabase
+        .from('race_results')
+        .select('drivers(id, name, number)')
+        .eq('race_id', selectedRace);
+
+      if (driversError) {
+        console.error('Error fetching drivers:', driversError);
+      } else {
+        const participatingDrivers = driversData.map(d => ({
+          id: d.drivers.id,
+          name: d.drivers.name,
+          number: d.drivers.number,
+        }));
+        setDriversList(participatingDrivers);
+        if (participatingDrivers.length > 0) {
+          setSelectedDriver(participatingDrivers[0].id);
+        }
+      }
+    };
+
+    fetchLapsAndDrivers();
+  }, [selectedRace]);
+
+  useEffect(() => {
+    console.log('fetchTelemetry called');
+    console.log('selectedRace:', selectedRace);
+    console.log('selectedLap:', selectedLap);
+    console.log('selectedDriver:', selectedDriver);
+    console.log('driversList:', driversList);
+
+    const fetchTelemetry = async () => {
+      if (!selectedRace || !selectedLap || !selectedDriver) {
+        setTelemetryData({ speed: [], rpm: [], throttleBrake: [], accelerationSteering: [] });
+        setRaceLinesForMap({});
+        setProcessedTelemetryForTable([]); // Clear table data
+        setLoadingTelemetry(false); // Ensure loading is false if conditions not met
+        return;
+      }
+
+      setLoadingTelemetry(true); // Set loading to true
+      const driverIdToNumberMap = new Map(driversList.map(d => [d.id, d.number]));
+
+      let query = supabase
+        .from('telemetry')
+        .select('timestamp, name, value, driver_id')
+        .eq('race_id', selectedRace)
+        .eq('lap_number', parseInt(selectedLap, 10))
+        .in('name', ['speed', 'nmot', 'ath', 'aps', 'pbrake_f', 'pbrake_r', 'accx_can', 'accy_can', 'Steering_Angle', 'Laptrigger_lapdist_dls', 'VBOX_Long_Minutes', 'VBOX_Lat_Min']);
+
+      query = query.eq('driver_id', selectedDriver);
+
+      const { data, error } = await query.order('timestamp', { ascending: true });
+     
+      if (error) {
+        console.error('Error fetching telemetry:', error);
+        setLoadingTelemetry(false); // Set loading to false on error
+        return;
+      }
+     console.log('Data: ',data)
+      const telemetryByTime = new Map();
+      const driverNumber = driverIdToNumberMap.get(selectedDriver);
+
+      if (driverNumber === undefined || driverNumber === null) {
+        console.warn('Selected driver number not found.');
+        setTelemetryData({ speed: [], rpm: [], throttleBrake: [], accelerationSteering: [] });
+        setRaceLinesForMap({});
+        setProcessedTelemetryForTable([]); // Clear table data
+        setLoadingTelemetry(false); // Set loading to false
+        return;
+      }
+
+      // Collect all unique timestamps
+      const uniqueTimestamps = [...new Set(data.map(d => d.timestamp))].sort();
+
+      uniqueTimestamps.forEach(timestamp => {
+        const timestampKey = new Date(timestamp).toISOString();
+        const row: { timestamp: Date; [key: string]: any } = { timestamp: new Date(timestamp) };
+
+        // Initialize all expected keys for the current driver to null
+        const expectedTelemetryNames = ['speed', 'nmot', 'ath', 'aps', 'pbrake_f', 'pbrake_r', 'accx_can', 'accy_can', 'Steering_Angle', 'Laptrigger_lapdist_dls', 'VBOX_Lat_Min', 'VBOX_Long_Minutes'];
+        expectedTelemetryNames.forEach(name => {
+          row[`${driverNumber}_${name}`] = null;
+        });
+
+        // Populate with actual data
+        data.filter(d => d.timestamp === timestamp && d.driver_id === selectedDriver).forEach(d => {
+          row[`${driverNumber}_${d.name}`] = d.value;
+        });
+        telemetryByTime.set(timestampKey, row);
+      });
+
+      const processedData = [...telemetryByTime.values()];
+      console.log('Processed telemetry data for charts:', processedData);
+      setProcessedTelemetryForTable(processedData);
+      setCurrentPage(1); // Reset to first page on new data
+
+      // Prepare data for the map
+      const telemetryPath: Array<any> = [];
+      processedData.forEach(d => {
+        const lat = d[`${driverNumber}_VBOX_Lat_Min`];
+        const lon = d[`${driverNumber}_VBOX_Long_Minutes`];
+        if (lat !== null && lon !== null && lat !== undefined && lon !== undefined) {
+          telemetryPath.push({
+            lat: lat,
+            lon: lon,
+            timestamp: d.timestamp,
+            speed: d[`${driverNumber}_speed`],
+            rpm: d[`${driverNumber}_nmot`],
+            throttle: d[`${driverNumber}_ath`],
+            accelPedal: d[`${driverNumber}_aps`],
+            brakeF: d[`${driverNumber}_pbrake_f`],
+            brakeR: d[`${driverNumber}_pbrake_r`],
+            accelX: d[`${driverNumber}_accx_can`],
+            accelY: d[`${driverNumber}_accy_can`],
+            steeringAngle: d[`${driverNumber}_Steering_Angle`],
+            lapDist: d[`${driverNumber}_Laptrigger_lapdist_dls`],
+          });
+        }
+      });
+
+      const speeds = telemetryPath.map(d => d.speed).filter(s => s !== null && s !== undefined) as number[];
+      const minSpeed = Math.min(...speeds);
+      const maxSpeed = Math.max(...speeds);
+      setSpeedRange({min: minSpeed, max: maxSpeed});
+
+      setRaceLinesForMap({ [selectedDriver]: telemetryPath });
+
+      const speedData = processedData.map(d => ({
+        timestamp: d.timestamp,
+        [`${driverNumber}_speed`]: d[`${driverNumber}_speed`],
+      }));
+
+      const rpmData = processedData.map(d => ({
+        timestamp: d.timestamp,
+        [`${driverNumber}_nmot`]: d[`${driverNumber}_nmot`],
+      }));
+
+      const throttleBrakeData = processedData.map(d => {
+        const row = { timestamp: d.timestamp };
+        const driverNumber = driverIdToNumberMap.get(selectedDriver);
+        if (driverNumber !== undefined && driverNumber !== null) {
+          row[`${driverNumber}_ath`] = d[`${driverNumber}_ath`];
+          row[`${driverNumber}_aps`] = d[`${driverNumber}_aps`];
+          row[`${driverNumber}_pbrake_f`] = d[`${driverNumber}_pbrake_f`];
+          row[`${driverNumber}_pbrake_r`] = d[`${driverNumber}_pbrake_r`];
+        }
+        return row;
+      });
+
+      const accelerationSteeringData = processedData.map(d => {
+        const row = { timestamp: d.timestamp };
+        const driverNumber = driverIdToNumberMap.get(selectedDriver);
+        if (driverNumber !== undefined && driverNumber !== null) {
+          row[`${driverNumber}_accx_can`] = d[`${driverNumber}_accx_can`];
+          row[`${driverNumber}_accy_can`] = d[`${driverNumber}_accy_can`];
+          row[`${driverNumber}_Steering_Angle`] = d[`${driverNumber}_Steering_Angle`];
+        }
+        return row;
+      });
+
+      console.log('Processed speedData:', speedData);
+      console.log('Processed rpmData:', rpmData);
+      setTelemetryData({
+        speed: speedData,
+        rpm: rpmData,
+        throttleBrake: throttleBrakeData,
+        accelerationSteering: accelerationSteeringData,
+      });
+      setLoadingTelemetry(false); // Set loading to false after data is processed
+    };
+
+    fetchTelemetry();
+  }, [selectedRace, selectedLap, selectedDriver, driversList]);
+
+  const handleDriverChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedDriver(event.target.value);
+  };
+
+  const getDriverColor = (driverId: string) => {
+    const colors = ['#E30613', '#FFFFFF', '#00FF00', '#00FFFF', '#FF00FF', '#FFFF00', '#800000', '#008000', '#000080', '#808000'];
+    // Since only one driver is selected, we can just return the first color, or a color based on the driverId if needed.
+    // For simplicity, let's just return the first color for the single selected driver.
+    return colors[0];
+  };
+
+  const handleYearChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedYear(Number(event.target.value));
+  };
+
+  const handleRaceChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedRace(event.target.value);
+    setSelectedLap('');
+    setLapsList([]);
+    setSelectedDriver('');
+  };
+
+  const handleLapChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedLap(event.target.value);
+  };
+
+  const totalPages = Math.ceil(processedTelemetryForTable.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedData = processedTelemetryForTable.slice(startIndex, endIndex);
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
+
+  const handleGoToPage = (page: number) => {
+    const pageNumber = Math.max(1, Math.min(page, totalPages));
+    setCurrentPage(pageNumber);
+  };
+
+  const handlePageInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setPageInput(event.target.value);
+  };
+
+  const handlePageInputSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const pageNumber = parseInt(pageInput, 10);
+    if (!isNaN(pageNumber)) {
+      handleGoToPage(pageNumber);
+      setPageInput('');
+    }
+  };
+
+  const renderPageNumbers = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 5;
+    const halfMaxPages = Math.floor(maxPagesToShow / 2);
+    let startPage = Math.max(1, currentPage - halfMaxPages);
+    let endPage = Math.min(totalPages, currentPage + halfMaxPages);
+
+    if (currentPage - 1 <= halfMaxPages) {
+      endPage = Math.min(totalPages, maxPagesToShow);
+    }
+
+    if (totalPages - currentPage <= halfMaxPages) {
+      startPage = Math.max(1, totalPages - maxPagesToShow + 1);
+    }
+
+    if (startPage > 1) {
+      pageNumbers.push(<button key={1} onClick={() => handleGoToPage(1)} className={styles.button}>1</button>);
+      if (startPage > 2) {
+        pageNumbers.push(<span key="start-ellipsis">...</span>);
       }
     }
-    setSelectedDrivers(value);
-  };
 
-  const getDriverColor = (driverId) => {
-    return availableDrivers.find((d) => d.id === driverId)?.color || '#CCCCCC';
-  };
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(
+        <button key={i} onClick={() => handleGoToPage(i)} className={`${styles.button} ${currentPage === i ? styles.activePage : ''}`}>
+          {i}
+        </button>
+      );
+    }
 
-  // Prepare telemetry data for charts
-  const telemetryData = {
-    speed: currentLapData.drivers[selectedDrivers[0]]?.speed.map((data, index) => {
-      const row = { distance: data.distance };
-      selectedDrivers.forEach((driverId) => {
-        row[driverId] = currentLapData.drivers[driverId]?.speed[index]?.value;
-      });
-      return row;
-    }) || [],
-    throttle: currentLapData.drivers[selectedDrivers[0]]?.throttle.map((data, index) => {
-      const row = { distance: data.distance };
-      selectedDrivers.forEach((driverId) => {
-        row[driverId] = currentLapData.drivers[driverId]?.throttle[index]?.value;
-      });
-      return row;
-    }) || [],
-    brake: currentLapData.drivers[selectedDrivers[0]]?.brake.map((data, index) => {
-      const row = { distance: data.distance };
-      selectedDrivers.forEach((driverId) => {
-        row[driverId] = currentLapData.drivers[driverId]?.brake[index]?.value;
-      });
-      return row;
-    }) || [],
-  };
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pageNumbers.push(<span key="end-ellipsis">...</span>);
+      }
+      pageNumbers.push(<button key={totalPages} onClick={() => handleGoToPage(totalPages)} className={styles.button}>{totalPages}</button>);
+    }
 
-  // Prepare race lines for map
-  const raceLinesForMap = selectedDrivers.reduce((acc, driverId) => {
-    acc[driverId] = currentLapData.drivers[driverId]?.raceLines || [];
-    return acc;
-  }, {});
-
-  const handleRaceChange = (event) => {
-    setSelectedRace(event.target.value);
-    setSelectedLap('lap1'); // Reset lap selection when race changes
-    setSelectedDrivers(['driver1', 'driver2']); // Reset driver selection
-  };
-
-  const handleLapChange = (event) => {
-    setSelectedLap(event.target.value);
+    return pageNumbers;
   };
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <h1 className={styles.pageTitle}>Race Analysis</h1>
-        <div className={styles.selectors}>
+      </div>
+      <div className={styles.selectors}>
           <div className={styles.selectorGroup}>
-            <label htmlFor="race-select">Select Race:</label>
-            <select id="race-select" value={selectedRace} onChange={handleRaceChange} className={styles.dropdown}>
-              {Object.keys(allRaceData).map((raceKey) => (
-                <option key={raceKey} value={raceKey}>
-                  {raceKey.replace('race', 'Race ')}
+            <label htmlFor="year-select">Select Year:</label>
+            <select id="year-select" value={selectedYear} onChange={handleYearChange} className={styles.dropdown}>
+              {years.map((year) => (
+                <option key={year} value={year}>
+                  {year}
                 </option>
               ))}
             </select>
           </div>
           <div className={styles.selectorGroup}>
+            <label htmlFor="race-select">Select Race:</label>
+                          <select id="race-select" value={selectedRace} onChange={handleRaceChange} className={styles.dropdown}>
+                            <option value="">Select a Race</option>
+                            {loadingRaces ? (
+                              <option>Loading races...</option>
+                            ) : (
+                              racesList.map((race) => (
+                                <option key={race.id} value={race.id}>
+                                  {race.name}
+                                </option>
+                              ))
+                            )}
+                          </select>          </div>
+          <div className={styles.selectorGroup}>
             <label htmlFor="lap-select">Select Lap:</label>
             <select id="lap-select" value={selectedLap} onChange={handleLapChange} className={styles.dropdown}>
-              {Object.keys(currentRaceData).map((lapKey) => (
-                <option key={lapKey} value={lapKey}>
-                  {lapKey.replace('lap', 'Lap ')}
+              {lapsList.map((lap) => (
+                <option key={lap} value={lap}>
+                  Lap {lap}
                 </option>
               ))}
             </select>
@@ -260,96 +414,281 @@ export default function AnalysisPage() {
             <label htmlFor="driver-select">Select Drivers:</label>
             <select
               id="driver-select"
-              multiple
-              value={selectedDrivers}
+              value={selectedDriver}
               onChange={handleDriverChange}
               className={styles.dropdown}
-              size={Math.min(availableDrivers.length, 5)} // Show max 5 options at once
             >
-              {availableDrivers.map((driver) => (
+              {driversList.map((driver) => (
                 <option key={driver.id} value={driver.id}>
-                  {driver.name}
+                  {driver.number}
                 </option>
               ))}
             </select>
           </div>
         </div>
-      </div>
       <div className={styles.mainGrid}>
         <div className={styles.mapContainer}>
-          <Map raceLines={raceLinesForMap} availableDrivers={availableDrivers} />
+          <RaceMap raceLines={raceLinesForMap} availableDrivers={driversList} selectedLap={selectedLap} speedRange={speedRange} />
         </div>
 
-        <div className={styles.chartsContainer}>
-          <div className={styles.chart}>
-            <h3 className={styles.chartTitle}>Speed</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={telemetryData.speed}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis dataKey="distance" stroke="#aaa" />
-                <YAxis stroke="#aaa" />
-                <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }} />
-                <Legend />
-                {selectedDrivers.map((driverId) => (
-                  <Line
-                    key={driverId}
-                    type="monotone"
-                    dataKey={driverId}
-                    stroke={getDriverColor(driverId)}
-                    dot={false}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <div className={styles.chart}>
-            <h3 className={styles.chartTitle}>Throttle</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={telemetryData.throttle}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis dataKey="distance" stroke="#aaa" />
-                <YAxis stroke="#aaa" />
-                <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }} />
-                <Legend />
-                {selectedDrivers.map((driverId) => (
-                  <Line
-                    key={driverId}
-                    type="monotone"
-                    dataKey={driverId}
-                    stroke={getDriverColor(driverId)}
-                    dot={false}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <div className={styles.chart}>
-            <h3 className={styles.chartTitle}>Brake</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={telemetryData.brake}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis dataKey="distance" stroke="#aaa" />
-                <YAxis stroke="#aaa" />
-                <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }} />
-                <Legend />
-                {selectedDrivers.map((driverId) => (
-                  <Line
-                    key={driverId}
-                    type="monotone"
-                    dataKey={driverId}
-                    stroke={getDriverColor(driverId)}
-                    dot={false}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <div className={styles.deepDiveLink}>
+                                <div className={styles.chartsContainer}>
+                
+                                  {/* Speed Chart */}
+                                  <div className={styles.chart}>
+                                                <h3 className={styles.chartTitle}>Speed</h3>
+                                                <ResponsiveContainer width="100%" height={200}>
+                                                  <LineChart data={telemetryData.speed}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                                                    <XAxis dataKey="timestamp" stroke="#aaa" tickFormatter={(timestamp) => new Date(timestamp).toLocaleTimeString()} />
+                                                    <YAxis stroke="#aaa" />                                        <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }} />
+                                        <Legend />
+                                        {selectedDriver && (() => {
+                                          const driver = driversList.find(d => d.id === selectedDriver);
+                                          if (!driver) return null;
+                                          return (
+                                            <Fragment key={selectedDriver}>
+                                                                            <Line
+                                                                              key={`${selectedDriver}-speed`}
+                                                                              type="monotone"
+                                                                              dataKey={`${driver.number}_speed`}
+                                                                              name={`Driver ${driver.number} Speed`}
+                                                                              stroke={getDriverColor(selectedDriver)}
+                                                                              strokeWidth="4"
+                                                                              dot={true}
+                                                                              connectNulls={true}
+                                                                            />                                            </Fragment>
+                                          );
+                                        })()}
+                                      </LineChart>
+                                    </ResponsiveContainer>
+                                  </div>
+                
+                                  {/* RPM Chart */}
+                                  <div className={styles.chart}>
+                                    <h3 className={styles.chartTitle}>RPM</h3>
+                                    <ResponsiveContainer width="100%" height={200}>
+                                      <LineChart data={telemetryData.rpm}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                                        <XAxis dataKey="timestamp" stroke="#aaa" tickFormatter={(timestamp) => new Date(timestamp).toLocaleTimeString()} />
+                                        <YAxis stroke="#aaa" />
+                                        <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }} />
+                                        <Legend />
+                                        {selectedDriver && (() => {
+                                          const driver = driversList.find(d => d.id === selectedDriver);
+                                          if (!driver) return null;
+                                          return (
+                                            <Fragment key={selectedDriver}>
+                                                                            <Line
+                                                                              key={`${selectedDriver}-nmot`}
+                                                                              type="monotone"
+                                                                              dataKey={`${driver.number}_nmot`}
+                                                                              name={`Driver ${driver.number} RPM`}
+                                                                              stroke={getDriverColor(selectedDriver)}
+                                                                              strokeWidth="4"
+                                                                              dot={true}
+                                                                              connectNulls={true}
+                                                                            />                                            </Fragment>
+                                          );
+                                        })()}
+                                      </LineChart>
+                                    </ResponsiveContainer>
+                                  </div>
+                
+                                  {/* Throttle & Brake Pressure Chart */}
+                                  <div className={styles.chart}>
+                                    <h3 className={styles.chartTitle}>Throttle & Brake</h3>
+                                    <ResponsiveContainer width="100%" height={200}>
+                                      <LineChart data={telemetryData.throttleBrake}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                                        <XAxis dataKey="timestamp" stroke="#aaa" tickFormatter={(timestamp) => new Date(timestamp).toLocaleTimeString()} />
+                                        <YAxis stroke="#aaa" />
+                                        <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }} />
+                                        <Legend />
+                                        {selectedDriver && (() => {
+                                          const driver = driversList.find(d => d.id === selectedDriver);
+                                          if (!driver) return null;
+                                          return (
+                                            <Fragment key={selectedDriver}>
+                                              <Line
+                                                key={`${selectedDriver}-ath`}
+                                                type="monotone"
+                                                dataKey={`${driver.number}_ath`}
+                                                name={`Driver ${driver.number} Throttle`}
+                                                stroke={getDriverColor(selectedDriver)}
+                                                strokeWidth="4"
+                                                dot={false}
+                                              />
+                                              <Line
+                                                key={`${selectedDriver}-aps`}
+                                                type="monotone"
+                                                dataKey={`${driver.number}_aps`}
+                                                name={`Driver ${driver.number} Accel Pedal`}
+                                                stroke={getDriverColor(selectedDriver)}
+                                                strokeDasharray="5 5"
+                                                strokeWidth="4"
+                                                dot={false}
+                                              />
+                                              <Line
+                                                key={`${selectedDriver}-pbrake_f`}
+                                                type="monotone"
+                                                dataKey={`${driver.number}_pbrake_f`}
+                                                name={`Driver ${driver.number} Front Brake`}
+                                                stroke={getDriverColor(selectedDriver)}
+                                                strokeDasharray="3 3"
+                                                strokeWidth="4"
+                                                dot={false}
+                                              />
+                                              <Line
+                                                key={`${selectedDriver}-pbrake_r`}
+                                                type="monotone"
+                                                dataKey={`${driver.number}_pbrake_r`}
+                                                name={`Driver ${driver.number} Rear Brake`}
+                                                stroke={getDriverColor(selectedDriver)}
+                                                strokeDasharray="1 1"
+                                                strokeWidth="4"
+                                                dot={false}
+                                              />
+                                            </Fragment>
+                                          );
+                                        })()}
+                                      </LineChart>
+                                    </ResponsiveContainer>
+                                  </div>
+                
+                                  {/* Acceleration & Steering Chart */}
+                                  <div className={styles.chart}>
+                                    <h3 className={styles.chartTitle}>Acceleration & Steering</h3>
+                                    <ResponsiveContainer width="100%" height={200}>
+                                      <LineChart data={telemetryData.accelerationSteering}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                                        <XAxis dataKey="timestamp" stroke="#aaa" tickFormatter={(timestamp) => new Date(timestamp).toLocaleTimeString()} />
+                                        <YAxis yAxisId="left" stroke="#aaa" />
+                                        <YAxis yAxisId="right" orientation="right" stroke="#aaa" />
+                                        <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }} />
+                                        <Legend />
+                                        {selectedDriver && (() => {
+                                          const driver = driversList.find(d => d.id === selectedDriver);
+                                          if (!driver) return null;
+                                          return (
+                                            <Fragment key={selectedDriver}>
+                                              <Line
+                                                yAxisId="left"
+                                                key={`${selectedDriver}-accx_can`}
+                                                type="monotone"
+                                                dataKey={`${driver.number}_accx_can`}
+                                                name={`Driver ${driver.number} Accel X`}
+                                                stroke="#E30613"
+                                                dot={false}
+                                              />
+                                              <Line
+                                                yAxisId="left"
+                                                key={`${selectedDriver}-accy_can`}
+                                                type="monotone"
+                                                dataKey={`${driver.number}_accy_can`}
+                                                name={`Driver ${driver.number} Accel Y`}
+                                                stroke="#FFFF00"
+                                                strokeDasharray="3 3"
+                                                dot={false}
+                                              />
+                                              <Line
+                                                yAxisId="right"
+                                                key={`${selectedDriver}-Steering_Angle`}
+                                                type="monotone"
+                                                dataKey={`${driver.number}_Steering_Angle`}
+                                                name={`Driver ${driver.number} Steering Angle`}
+                                                stroke="#00FF00"
+                                                strokeDasharray="5 5"
+                                                dot={false}
+                                              />
+                                            </Fragment>
+                                          );
+                                        })()}
+                                      </LineChart>
+                                    </ResponsiveContainer>
+                                  </div>          <div className={styles.deepDiveLink}>
             <Link href="/analysis/lap-deep-dive" className={styles.button}>
               View Single Lap Deep Dive
             </Link>
           </div>
         </div>
+
+        <div className={styles.lapResultsTable}>
+          <h3 className={styles.chartTitle}>Telemetry Data</h3>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Speed</th>
+                <th>RPM</th>
+                <th>Throttle</th>
+                <th>Accel Pedal</th>
+                <th>Brake F</th>
+                <th>Brake R</th>
+                <th>Accel X</th>
+                <th>Accel Y</th>
+                <th>Steering Angle</th>
+                <th>Lap Dist</th>
+                <th>Longitude</th>
+                <th>Latitude</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loadingTelemetry ? (
+                <tr>
+                  <td colSpan={13} className={styles.loadingIndicator}>Loading telemetry data...</td>
+                </tr>
+              ) : processedTelemetryForTable.length === 0 ? (
+                <tr>
+                  <td colSpan={13} className={styles.noDataIndicator}>No telemetry data found for the selected lap and driver.</td>
+                </tr>
+              ) : (
+                paginatedData.map((dataPoint, index) => {
+                  const driver = driversList.find(d => d.id === selectedDriver);
+                  const driverNumber = driver ? driver.number : null;
+                  if (!driverNumber) return null;
+
+                  return (
+                    <tr key={index}>
+                      <td>{new Date(dataPoint.timestamp).toLocaleTimeString()}</td>
+                      <td>{dataPoint[`${driverNumber}_speed`]?.toFixed(2)}</td>
+                      <td>{dataPoint[`${driverNumber}_nmot`]?.toFixed(0)}</td>
+                      <td>{dataPoint[`${driverNumber}_ath`]?.toFixed(2)}</td>
+                      <td>{dataPoint[`${driverNumber}_aps`]?.toFixed(2)}</td>
+                      <td>{dataPoint[`${driverNumber}_pbrake_f`]?.toFixed(2)}</td>
+                      <td>{dataPoint[`${driverNumber}_pbrake_r`]?.toFixed(2)}</td>
+                      <td>{dataPoint[`${driverNumber}_accx_can`]?.toFixed(2)}</td>
+                      <td>{dataPoint[`${driverNumber}_accy_can`]?.toFixed(2)}</td>
+                      <td>{dataPoint[`${driverNumber}_Steering_Angle`]?.toFixed(2)}</td>
+                      <td>{dataPoint[`${driverNumber}_Laptrigger_lapdist_dls`]?.toFixed(2)}</td>
+                      <td>{dataPoint[`${driverNumber}_VBOX_Long_Minutes`]?.toFixed(6)}</td>
+                      <td>{dataPoint[`${driverNumber}_VBOX_Lat_Min`]?.toFixed(6)}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+          <div className={styles.paginationControls}>
+            <button onClick={() => handleGoToPage(1)} disabled={currentPage === 1} className={styles.button}>
+              First
+            </button>
+            <button onClick={handlePreviousPage} disabled={currentPage === 1} className={styles.button}>
+              Previous
+            </button>
+            {renderPageNumbers()}
+            <button onClick={handleNextPage} disabled={currentPage === totalPages} className={styles.button}>
+              Next
+            </button>
+            <button onClick={() => handleGoToPage(totalPages)} disabled={currentPage === totalPages} className={styles.button}>
+              Last
+            </button>
+            <form onSubmit={handlePageInputSubmit}>
+              <input type="number" value={pageInput} onChange={handlePageInputChange} className={styles.pageInput} min="1" max={totalPages} />
+              <button type="submit" className={styles.button}>Go</button>
+            </form>
+          </div>
+        </div>
+
         <div className={styles.aiPanel}>
           <h3 className={styles.aiPanelTitle}>AI Race Engineer</h3>
           <div className={styles.aiChatBox}>

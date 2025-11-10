@@ -25,6 +25,15 @@ const lapData = {
   ],
 };
 
+const lapResults = [
+  { lap: 1, driver: 'Driver A', lapTime: '1:25.123', sector1: '28.123', sector2: '30.000', sector3: '27.000', speedTrap: '280' },
+  { lap: 2, driver: 'Driver B', lapTime: '1:24.500', sector1: '27.900', sector2: '29.800', sector3: '26.800', speedTrap: '282' },
+  { lap: 3, driver: 'Driver A', lapTime: '1:23.999', sector1: '27.500', sector2: '29.500', sector3: '26.999', speedTrap: '285' },
+  { lap: 4, driver: 'Driver C', lapTime: '1:26.000', sector1: '28.500', sector2: '30.500', sector3: '27.000', speedTrap: '278' },
+  { lap: 5, driver: 'Driver A', lapTime: '1:23.456', sector1: '25.123', sector2: '30.456', sector3: '27.877', speedTrap: '288' }, // Selected lap
+  { lap: 6, driver: 'Driver B', lapTime: '1:24.100', sector1: '27.600', sector2: '29.700', sector3: '26.800', speedTrap: '283' },
+];
+
 export default function LapDeepDivePage() {
   return (
     <div className={styles.container}>
@@ -74,6 +83,36 @@ export default function LapDeepDivePage() {
             ))}
           </ul>
         </div>
+      </div>
+
+      <div className={styles.lapResultsTable}>
+        <h3 className={styles.chartTitle}>Lap Results for Race</h3>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Lap</th>
+              <th>Driver</th>
+              <th>Lap Time</th>
+              <th>Sector 1</th>
+              <th>Sector 2</th>
+              <th>Sector 3</th>
+              <th>Speed Trap (km/h)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lapResults.map((lap, index) => (
+              <tr key={index} className={lap.lap === lapData.lapNumber ? styles.selectedLap : ''}>
+                <td>{lap.lap}</td>
+                <td>{lap.driver}</td>
+                <td>{lap.lapTime}</td>
+                <td>{lap.sector1}</td>
+                <td>{lap.sector2}</td>
+                <td>{lap.sector3}</td>
+                <td>{lap.speedTrap}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <div className={styles.turnByTurnLink}>
