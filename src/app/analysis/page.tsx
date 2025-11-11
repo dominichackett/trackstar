@@ -620,8 +620,17 @@ export default function AnalysisPage() {
                                       </LineChart>
                                     </ResponsiveContainer>
                                   </div>          <div className={styles.deepDiveLink}>
-            <Link href="/analysis/lap-deep-dive" className={styles.button}>
+            <Link
+              href={`/analysis/lap-deep-dive?raceId=${selectedRace}&driverId=${selectedDriver}&lapNumber=${selectedLap}`}
+              className={styles.button}
+            >
               View Single Lap Deep Dive
+            </Link>
+            <Link
+              href={`/analysis/driver-laps-deep-dive?raceId=${selectedRace}&driverId=${selectedDriver}`}
+              className={styles.button}
+            >
+              View Driver Laps Deep Dive
             </Link>
           </div>
         </div>

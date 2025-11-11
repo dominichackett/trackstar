@@ -3,12 +3,12 @@
 import styles from './StatusIndicator.module.css';
 
 interface StatusIndicatorProps {
-  loading: boolean;
-  error: string | null;
-  data: any[];
-  loadingMessage: string;
-  errorMessage: string;
-  noDataMessage: string;
+  loading?: boolean;
+  error?: string | null;
+  data?: any[];
+  loadingMessage?: string;
+  errorMessage?: string;
+  noDataMessage?: string;
 }
 
 export default function StatusIndicator({
@@ -27,7 +27,7 @@ export default function StatusIndicator({
     return <div className={styles.errorIndicator}>{errorMessage}</div>;
   }
 
-  if (data.length === 0) {
+  if (noDataMessage && (!data || data.length === 0)) {
     return <div className={styles.noDataIndicator}>{noDataMessage}</div>;
   }
 
