@@ -59,7 +59,7 @@ const getColorForSpeed = (speed: number, minSpeed: number, maxSpeed: number) => 
   return `hsl(${hue}, 100%, 50%)`;
 };
 
-export default function Map({ raceLines, availableDrivers, selectedLap, speedRange }: MapProps) {
+export default function RaceMap({ raceLines, availableDrivers, selectedLap, speedRange }: MapProps) {
   console.log('RaceMap received raceLines:', raceLines);
   // Find the first available race line to set the initial center
   const firstDriverId = Object.keys(raceLines)[0];

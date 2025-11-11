@@ -1,0 +1,47 @@
+.lapDataContainer {
+  background-color: #1a1a1a;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  color: #fff;
+}
+
+.title {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  color: #E30613;
+  border-bottom: 1px solid #333;
+  padding-bottom: 0.5rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.dataItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  font-size: 0.8rem;
+  color: #aaa;
+  margin-bottom: 0.25rem;
+}
+
+.value {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.faster {
+  color: #00ff00; /* Green for faster */
+  margin-left: 0.5rem;
+}
+
+.slower {
+  color: #ff0000; /* Red for slower */
+  margin-left: 0.5rem;
+}

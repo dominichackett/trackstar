@@ -113,6 +113,45 @@ const intervalToSeconds = (intervalString: string): number => {
   return seconds;
 };
 
+// Environment variables for Gemini API
+const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-pro';
+const GEMINI_API_URL = process.env.NEXT_PUBLIC_GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/';
+
+// Function to call Gemini API
+const generateGeminiResponse = async (prompt: string): Promise<string> => {
+  if (!GEMINI_API_KEY) {
+    console.error('Gemini API key is not set.');
+    return 'Error: Gemini API key is not configured.';
+  }
+
+  try {
+    const response = await fetch(`${GEMINI_API_URL}${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }],
+        }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Gemini API error:', errorData);
+      return `Error from AI: ${errorData.error?.message || 'Unknown error'}`;
+    }
+
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text;
+  } catch (err: any) {
+    console.error('Failed to call Gemini API:', err);
+    return `Error: Failed to connect to AI (${err.message})`;
+  }
+};
+
 export default function LapDeepDivePage() {
   const supabase = getSupabaseClient();
   const searchParams = useSearchParams();
@@ -136,6 +175,13 @@ export default function LapDeepDivePage() {
   const [allDrivers, setAllDrivers] = useState<Driver[] | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // AI Race Engineer states
+  const [aiInsights, setAiInsights] = useState<string | null>(null);
+  const [userQuestion, setUserQuestion] = useState<string>('');
+  const [conversationHistory, setConversationHistory] = useState<{ role: 'user' | 'ai', text: string }[]>([]);
+  const [isSendingMessage, setIsSendingMessage] = useState<boolean>(false); // New state for loading indicator
+
 
   useEffect(() => {
     async function fetchInitialData() {
@@ -267,11 +313,15 @@ export default function LapDeepDivePage() {
         setBestSectorsInfo({ s1: null, s2: null, s3: null });
         setRaceInfo(null);
         setAllDrivers(null);
+        setAiInsights(null); // Clear AI insights
+        setConversationHistory([]); // Clear conversation history
         return;
       }
 
       setLoading(true);
       setError(null);
+      setAiInsights(null); // Clear AI insights
+      setConversationHistory([]); // Clear conversation history
 
       try {
         // Fetch Race Info
@@ -304,7 +354,7 @@ export default function LapDeepDivePage() {
           .order('lap_time', { ascending: true });
 
         if (allLapsError) throw allLapsError;
-        setAllLapsData(allLaps);
+        // setAllLapsData(allLaps); // Temporarily comment out to process deltas
 
         // Fetch All Drivers
         const { data: drivers, error: driversError } = await supabase
@@ -444,6 +494,20 @@ export default function LapDeepDivePage() {
             kph_delta: bestKPH && lap.kph !== null ? lap.kph - bestKPH : null,
           }));
           setAllLapsData(lapsWithDeltas);
+
+          // --- AI Summary Generation ---
+          if (!isSendingMessage) {
+            setIsSendingMessage(true);
+            const prompt = `You are an expert race engineer analyzing lap performance.\n            Here is the data for lap number ${inputLapNumber} in race ${race.name}:\n            ${JSON.stringify(lapsWithDeltas, null, 2)}\n            ${JSON.stringify(drivers, null, 2)}\n
+            Provide a concise summary of the performance of all drivers on this lap. Highlight key strengths, weaknesses, and any notable aspects. Focus on lap times, sector times, consistency, and speed relative to each other. Keep it under 600 words.`;
+
+            const summary = await generateGeminiResponse(prompt);
+            setAiInsights(summary);
+            setConversationHistory([{ role: 'ai', text: summary }]);
+            setIsSendingMessage(false);
+          }
+          // --- End AI Summary Generation ---
+
         } else {
           setAllLapsData(allLaps);
         }
@@ -471,10 +535,6 @@ export default function LapDeepDivePage() {
     return <StatusIndicator noDataMessage="No lap data found for the selected parameters." data={allLapsData || []} />;
   }
 
-  const getDriverName = (driverId: string) => {
-    return allDrivers?.find(d => d.id === driverId)?.name || 'Unknown Driver';
-  };
-
   const getDriverNumber = (driverId: string) => {
     return allDrivers?.find(d => d.id === driverId)?.number || 'N/A';
   };
@@ -485,10 +545,30 @@ export default function LapDeepDivePage() {
     return `${minutes}:${remainingSeconds.padStart(6, '0')}`;
   };
 
-  const formatDelta = (delta: number | null) => {
-    if (delta === null) return 'N/A';
-    const sign = delta >= 0 ? '+' : '';
-    return `${sign}${delta.toFixed(3)}s`;
+  const getDeltaInfo = (delta: number | null, metricType: 'time' | 'speed') => {
+    if (delta === null || isNaN(delta)) return { text: 'N/A', className: '' };
+  
+    const isTime = metricType === 'time';
+    // For speed, the delta is already a raw number, for time it's in seconds.
+    const suffix = isTime ? 's' : '';
+    const text = `${delta >= 0 ? '+' : ''}${delta.toFixed(3)}${suffix}`;
+    let className = '';
+  
+    // For time, lower is better. A positive delta means you are SLOWER than the best.
+    if (isTime) {
+      if (delta > 0.001) className = styles['delta-bad']; // Slower
+      else if (delta < -0.001) className = styles['delta-good']; // Faster
+      else className = styles['delta-neutral']; // Best
+    } 
+    // For speed, higher is better. The delta is `current - best`, so it's <= 0.
+    // A negative delta means you are SLOWER than the best.
+    else { // speed
+      if (delta < -0.01) className = styles['delta-bad']; // Slower
+      else if (delta > 0.01) className = styles['delta-good']; // Faster (not possible with current logic but good practice)
+      else className = styles['delta-neutral']; // Best
+    }
+  
+    return { text, className };
   };
 
   const handleGoClick = () => {
@@ -501,6 +581,29 @@ export default function LapDeepDivePage() {
     } else {
       setError('Please select a race and enter a lap number.');
     }
+  };
+
+  // Function to handle sending messages to AI
+  const handleSendMessage = async () => {
+    if (!userQuestion.trim() || isSendingMessage) return;
+
+    const newUserMessage = { role: 'user' as const, text: userQuestion };
+    setConversationHistory((prev) => [...prev, newUserMessage]);
+    setUserQuestion('');
+    setIsSendingMessage(true);
+
+    const context = `Current conversation: ${conversationHistory.map(msg => `${msg.role}: ${msg.text}`).join('\n')}\nUser: ${newUserMessage.text}`;
+    const prompt = `You are an expert race engineer analyzing lap performance.
+    Here is the data for lap number ${inputLapNumber} in race ${raceInfo?.name}:
+    ${JSON.stringify(allLapsData, null, 2)}
+    ${JSON.stringify(allDrivers, null, 2)}
+
+    Based on the provided data and the conversation history, answer the user's question: "${newUserMessage.text}".
+    Keep your response concise and directly address the question.`;
+
+    const aiResponse = await generateGeminiResponse(prompt);
+    setConversationHistory((prev) => [...prev, { role: 'ai', text: aiResponse }]);
+    setIsSendingMessage(false);
   };
 
   return (
@@ -537,59 +640,106 @@ export default function LapDeepDivePage() {
         <p><strong>Lap Number:</strong> {inputLapNumber}</p>
       </div>
 
-      {raceWinnerInfo && (
-        <div className={styles.summarySection}>
-          <h2>Race Winner</h2>
-          <p><strong>Driver:</strong> {raceWinnerInfo.drivers.name} ({raceWinnerInfo.drivers.number})</p>
-          <p><strong>Best Lap Time:</strong> {raceWinnerInfo.best_lap_time}</p>
-          <p><strong>Total Elapsed Time:</strong> {raceWinnerInfo.elapsed_time}</p>
-        </div>
-      )}
+      <div className={styles.summaryGrid}>
+        {raceWinnerInfo && (
+          <div className={styles.summarySection}>
+            <h2>Race Winner</h2>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Driver</span>
+              <span className={styles.summaryValue}>{raceWinnerInfo.drivers.name} ({raceWinnerInfo.drivers.number})</span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Best Lap</span>
+              <span className={styles.summaryValue}>{raceWinnerInfo.best_lap_time}</span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Total Time</span>
+              <span className={styles.summaryValue}>{raceWinnerInfo.elapsed_time}</span>
+            </div>
+          </div>
+        )}
 
-      {bestSectorsInfo.s1 && bestSectorsInfo.s2 && bestSectorsInfo.s3 && (
-        <div className={styles.summarySection}>
-          <h2>Best Sectors for Lap {inputLapNumber}</h2>
-          <p>
-            <strong>Sector 1:</strong> {formatTime(bestSectorsInfo.s1.time)} by Driver {bestSectorsInfo.s1.driverNumber}
-          </p>
-          <p>
-            <strong>Sector 2:</strong> {formatTime(bestSectorsInfo.s2.time)} by Driver {bestSectorsInfo.s2.driverNumber}
-          </p>
-          <p>
-            <strong>Sector 3:</strong> {formatTime(bestSectorsInfo.s3.time)} by Driver {bestSectorsInfo.s3.driverNumber}
-          </p>
-        </div>
-      )}
+        {bestSectorsInfo.s1 && bestSectorsInfo.s2 && bestSectorsInfo.s3 && (
+          <div className={styles.summarySection}>
+            <h2>Best Sectors for Lap {inputLapNumber}</h2>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Sector 1</span>
+              <span className={styles.summaryValue}>
+                {formatTime(bestSectorsInfo.s1.time)}
+                <span className={styles.summaryContext}>by Driver {bestSectorsInfo.s1.driverNumber}</span>
+              </span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Sector 2</span>
+              <span className={styles.summaryValue}>
+                {formatTime(bestSectorsInfo.s2.time)}
+                <span className={styles.summaryContext}>by Driver {bestSectorsInfo.s2.driverNumber}</span>
+              </span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Sector 3</span>
+              <span className={styles.summaryValue}>
+                {formatTime(bestSectorsInfo.s3.time)}
+                <span className={styles.summaryContext}>by Driver {bestSectorsInfo.s3.driverNumber}</span>
+              </span>
+            </div>
+          </div>
+        )}
 
-      {bestOverallLapInfo.bestLapTime && bestOverallLapInfo.bestKPH && bestOverallLapInfo.bestTopSpeed && (
-        <div className={styles.summarySection}>
-          <h2>Overall Best for Lap {inputLapNumber}</h2>
-          <p>
-            <strong>Best Lap Time:</strong> {formatTime(bestOverallLapInfo.bestLapTime.time)} by Driver {bestOverallLapInfo.bestLapTime.driverNumber}
-          </p>
-          <p>
-            <strong>Top Average KPH:</strong> {bestOverallLapInfo.bestKPH.time.toFixed(2)} by Driver {bestOverallLapInfo.bestKPH.driverNumber}
-          </p>
-          <p>
-            <strong>Top Speed:</strong> {bestOverallLapInfo.bestTopSpeed.time.toFixed(2)} by Driver {bestOverallLapInfo.bestTopSpeed.driverNumber}
-          </p>
-        </div>
-      )}
+        {bestOverallLapInfo.bestLapTime && bestOverallLapInfo.bestKPH && bestOverallLapInfo.bestTopSpeed && (
+          <div className={styles.summarySection}>
+            <h2>Overall Best for Lap {inputLapNumber}</h2>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Best Lap Time</span>
+              <span className={styles.summaryValue}>
+                {formatTime(bestOverallLapInfo.bestLapTime.time)}
+                <span className={styles.summaryContext}>by Driver {bestOverallLapInfo.bestLapTime.driverNumber}</span>
+              </span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Top Average KPH</span>
+              <span className={styles.summaryValue}>
+                {bestOverallLapInfo.bestKPH.time.toFixed(2)}
+                <span className={styles.summaryContext}>by Driver {bestOverallLapInfo.bestKPH.driverNumber}</span>
+              </span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Top Speed</span>
+              <span className={styles.summaryValue}>
+                {bestOverallLapInfo.bestTopSpeed.time.toFixed(2)}
+                <span className={styles.summaryContext}>by Driver {bestOverallLapInfo.bestTopSpeed.driverNumber}</span>
+              </span>
+            </div>
+          </div>
+        )}
 
-      {slowestOverallLapInfo.slowestLapTime && slowestOverallLapInfo.lowestKPH && slowestOverallLapInfo.lowestTopSpeed && (
-        <div className={styles.summarySection}>
-          <h2>Overall Slowest for Lap {inputLapNumber}</h2>
-          <p>
-            <strong>Slowest Lap Time:</strong> {formatTime(slowestOverallLapInfo.slowestLapTime.time)} by Driver {slowestOverallLapInfo.slowestLapTime.driverNumber}
-          </p>
-          <p>
-            <strong>Lowest Average KPH:</strong> {slowestOverallLapInfo.lowestKPH.time.toFixed(2)} by Driver {slowestOverallLapInfo.lowestKPH.driverNumber}
-          </p>
-          <p>
-            <strong>Lowest Top Speed:</strong> {slowestOverallLapInfo.lowestTopSpeed.time.toFixed(2)} by Driver {slowestOverallLapInfo.lowestTopSpeed.driverNumber}
-          </p>
-        </div>
-      )}
+        {slowestOverallLapInfo.slowestLapTime && slowestOverallLapInfo.lowestKPH && slowestOverallLapInfo.lowestTopSpeed && (
+          <div className={styles.summarySection}>
+            <h2>Overall Slowest for Lap {inputLapNumber}</h2>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Slowest Lap Time</span>
+              <span className={styles.summaryValue}>
+                {formatTime(slowestOverallLapInfo.slowestLapTime.time)}
+                <span className={styles.summaryContext}>by Driver {slowestOverallLapInfo.slowestLapTime.driverNumber}</span>
+              </span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Lowest Average KPH</span>
+              <span className={styles.summaryValue}>
+                {slowestOverallLapInfo.lowestKPH.time.toFixed(2)}
+                <span className={styles.summaryContext}>by Driver {slowestOverallLapInfo.lowestKPH.driverNumber}</span>
+              </span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Lowest Top Speed</span>
+              <span className={styles.summaryValue}>
+                {slowestOverallLapInfo.lowestTopSpeed.time.toFixed(2)}
+                <span className={styles.summaryContext}>by Driver {slowestOverallLapInfo.lowestTopSpeed.driverNumber}</span>
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className={styles.tableContainer}>
         <h2>All Drivers' Lap Data for Lap {inputLapNumber}</h2>
@@ -612,23 +762,32 @@ export default function LapDeepDivePage() {
             </tr>
           </thead>
           <tbody>
-            {allLapsData.map(lap => (
-              <tr key={lap.id}>
-                <td>{getDriverNumber(lap.driver_id)}</td>
-                <td>{lap.lap_time}</td>
-                <td>{formatDelta(lap.lap_time_delta)}</td>
-                <td>{lap.s1}</td>
-                <td>{formatDelta(lap.s1_delta)}</td>
-                <td>{lap.s2}</td>
-                <td>{formatDelta(lap.s2_delta)}</td>
-                <td>{lap.s3}</td>
-                <td>{formatDelta(lap.s3_delta)}</td>
-                <td>{lap.kph?.toFixed(2) || 'N/A'}</td>
-                <td>{formatDelta(lap.kph_delta)}</td>
-                <td>{lap.top_speed?.toFixed(2) || 'N/A'}</td>
-                <td>{formatDelta(lap.top_speed_delta)}</td>
-              </tr>
-            ))}
+            {allLapsData.map(lap => {
+              const lapTimeDeltaInfo = getDeltaInfo(lap.lap_time_delta, 'time');
+              const s1DeltaInfo = getDeltaInfo(lap.s1_delta, 'time');
+              const s2DeltaInfo = getDeltaInfo(lap.s2_delta, 'time');
+              const s3DeltaInfo = getDeltaInfo(lap.s3_delta, 'time');
+              const kphDeltaInfo = getDeltaInfo(lap.kph_delta, 'speed');
+              const topSpeedDeltaInfo = getDeltaInfo(lap.top_speed_delta, 'speed');
+
+              return (
+                <tr key={lap.id}>
+                  <td>{getDriverNumber(lap.driver_id)}</td>
+                  <td>{lap.lap_time}</td>
+                  <td className={lapTimeDeltaInfo.className}>{lapTimeDeltaInfo.text}</td>
+                  <td>{lap.s1}</td>
+                  <td className={s1DeltaInfo.className}>{s1DeltaInfo.text}</td>
+                  <td>{lap.s2}</td>
+                  <td className={s2DeltaInfo.className}>{s2DeltaInfo.text}</td>
+                  <td>{lap.s3}</td>
+                  <td className={s3DeltaInfo.className}>{s3DeltaInfo.text}</td>
+                  <td>{lap.kph?.toFixed(2) || 'N/A'}</td>
+                  <td className={kphDeltaInfo.className}>{kphDeltaInfo.text}</td>
+                  <td>{lap.top_speed?.toFixed(2) || 'N/A'}</td>
+                  <td className={topSpeedDeltaInfo.className}>{topSpeedDeltaInfo.text}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -646,6 +805,41 @@ export default function LapDeepDivePage() {
           <li><strong>Top Speed</strong>: The maximum speed in Kilometers Per Hour recorded during that lap.</li>
           <li><strong>Top Speed Delta</strong>: The difference in Top Speed between this driver's top speed and the highest top speed on this lap number. A positive value means slower (less Top Speed).</li>
         </ul>
+        <h3>Color Legend for Delta Values:</h3>
+        <ul>
+          <li style={{ color: '#28a745' }}><strong>Green:</strong> Faster than the best (should not occur with current delta calculation, but indicates improvement).</li>
+          <li style={{ color: '#FF0000' }}><strong>Bright Red:</strong> Slower than the best.</li>
+          <li style={{ color: '#FFFF00' }}><strong>Bright Yellow:</strong> Equal to the best (i.e., the fastest time or highest speed).</li>
+        </ul>
+      </div>
+
+      {/* AI Race Engineer Section */}
+      <div className={styles.aiPanel}>
+        <h3 className={styles.aiPanelTitle}>AI Race Engineer</h3>
+        <div className={styles.aiChatBox}>
+          {aiInsights && <div className={styles.aiMessage}>{aiInsights}</div>}
+          {conversationHistory.map((msg, index) => (
+            <div key={index} className={msg.role === 'ai' ? styles.aiMessage : styles.userMessage}>
+              {msg.text}
+            </div>
+          ))}
+        </div>
+        <div className={styles.aiInputContainer}>
+          <input
+            type="text"
+            placeholder="Ask a question..."
+            className={styles.aiInput}
+            value={userQuestion}
+            onChange={(e) => setUserQuestion(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                handleSendMessage();
+              }
+            }}
+            disabled={isSendingMessage} // Disable input while sending
+          />
+          <button className={styles.aiSendButton} onClick={handleSendMessage} disabled={isSendingMessage}>Send</button>
+        </div>
       </div>
     </div>
   );

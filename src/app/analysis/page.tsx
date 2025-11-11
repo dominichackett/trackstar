@@ -8,13 +8,56 @@ import styles from './page.module.css';
 import 'leaflet/dist/leaflet.css';
 import StatusIndicator from '@/components/StatusIndicator';
 import { getSupabaseClient } from '@/utils/supabase/client';
+import LapDataDisplay from '@/components/LapDataDisplay';
 
 interface Race {
   id: string;
   name: string;
 }
 
-const RaceMap = dynamic(() => import('../../components/Map'), { ssr: false });
+// Environment variables for Gemini API
+const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-pro';
+const GEMINI_API_URL = process.env.NEXT_PUBLIC_GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/';
+
+const RaceMap = dynamic(() => import('@/components/Map'), {
+  ssr: false,
+  loading: () => <p>Loading map...</p>,
+});
+
+// Function to call Gemini API
+const generateGeminiResponse = async (prompt: string): Promise<string> => {
+  if (!GEMINI_API_KEY) {
+    console.error('Gemini API key is not set.');
+    return 'Error: Gemini API key is not configured.';
+  }
+
+  try {
+    const response = await fetch(`${GEMINI_API_URL}${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }],
+        }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Gemini API error:', errorData);
+      return `Error from AI: ${errorData.error?.message || 'Unknown error'}`;
+    }
+
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text;
+  } catch (err: any) {
+    console.error('Failed to call Gemini API:', err);
+    return `Error: Failed to connect to AI (${err.message})`;
+  }
+};
 
 export default function AnalysisPage() {
   const supabase = getSupabaseClient();
@@ -43,6 +86,16 @@ export default function AnalysisPage() {
   const itemsPerPage = 40;
   const [loadingTelemetry, setLoadingTelemetry] = useState<boolean>(false);
   const [errorTelemetry, setErrorTelemetry] = useState<string | null>(null);
+
+  // AI Race Engineer states
+  const [aiInsights, setAiInsights] = useState<string | null>(null);
+  const [userQuestion, setUserQuestion] = useState<string>('');
+  const [conversationHistory, setConversationHistory] = useState<{ role: 'user' | 'ai', text: string }[]>([
+    { role: 'ai', text: 'Welcome! Ask me anything about this race.' }
+  ]);
+  const [isSendingMessage, setIsSendingMessage] = useState<boolean>(false); // New state for loading indicator
+  const [initialAnalysisDone, setInitialAnalysisDone] = useState<boolean>(false);
+  const [lapData, setLapData] = useState<any>(null);
 
   useEffect(() => {
     const fetchRaces = async () => {
@@ -279,6 +332,69 @@ export default function AnalysisPage() {
     fetchTelemetry();
   }, [selectedRace, selectedLap, selectedDriver, driversList]);
 
+  useEffect(() => {
+    const fetchLapData = async () => {
+      if (!selectedRace || !selectedLap || !selectedDriver) {
+        setLapData(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('laps')
+        .select('*')
+        .eq('race_id', selectedRace)
+        .eq('lap_number', parseInt(selectedLap, 10))
+        .eq('driver_id', selectedDriver)
+        .single(); // We expect only one lap record
+
+      if (error) {
+        console.error('Error fetching lap data:', error);
+        setLapData(null);
+      } else {
+        setLapData(data);
+      }
+    };
+
+    fetchLapData();
+  }, [selectedRace, selectedLap, selectedDriver, supabase]);
+
+  useEffect(() => {
+    const getInitialAnalysis = async () => {
+      if (processedTelemetryForTable.length > 0 && !initialAnalysisDone) {
+        setIsSendingMessage(true);
+        const driverName = driversList.find(d => d.id === selectedDriver)?.name || 'Unknown Driver';
+        const raceName = racesList.find(r => r.id === selectedRace)?.name || 'Unknown Race';
+
+        const prompt = `
+          You are an AI Race Engineer. Provide a brief, insightful overview of the driver's performance on this lap based on the following summary.
+          Context:
+          - Race: ${raceName}
+          - Driver: ${driverName}
+          - Lap Number: ${selectedLap}
+          - Lap Data: ${JSON.stringify(lapData, null, 2)}
+          - Telemetry Data Summary:
+            - Speed ranges from ${speedRange.min.toFixed(2)} to ${speedRange.max.toFixed(2)}.
+            - The data includes speed, RPM, throttle, brake pressure, acceleration, and steering angle.
+            - Total data points for this lap: ${processedTelemetryForTable.length}
+
+          What are the key takeaways from this lap?
+        `;
+
+        const aiResponse = await generateGeminiResponse(prompt);
+        setConversationHistory(prev => [...prev, { role: 'ai', text: aiResponse }]);
+        setIsSendingMessage(false);
+        setInitialAnalysisDone(true);
+      }
+    };
+
+    getInitialAnalysis();
+  }, [processedTelemetryForTable, initialAnalysisDone, selectedDriver, selectedLap, selectedRace, driversList, racesList, speedRange, lapData]);
+
+  useEffect(() => {
+    setInitialAnalysisDone(false);
+    setConversationHistory([{ role: 'ai', text: 'Welcome! Ask me anything about this race.' }]);
+  }, [selectedRace, selectedLap, selectedDriver]);
+
   const handleDriverChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedDriver(event.target.value);
   };
@@ -376,6 +492,40 @@ export default function AnalysisPage() {
     return pageNumbers;
   };
 
+  const handleSendMessage = async () => {
+    if (isSendingMessage || !userQuestion.trim()) return;
+
+    setIsSendingMessage(true);
+    const newConversationHistory = [...conversationHistory, { role: 'user' as const, text: userQuestion }];
+    setConversationHistory(newConversationHistory);
+
+    const driverName = driversList.find(d => d.id === selectedDriver)?.name || 'Unknown Driver';
+    const raceName = racesList.find(r => r.id === selectedRace)?.name || 'Unknown Race';
+
+    // Constructing a detailed prompt
+    const prompt = `
+      You are an AI Race Engineer. Analyze the following data and answer the user's question.
+      Context:
+      - Race: ${raceName}
+      - Driver: ${driverName} (ID: ${selectedDriver})
+      - Lap Number: ${selectedLap}
+      - Lap Data: ${JSON.stringify(lapData, null, 2)}
+      - Telemetry Data Summary:
+        - Speed ranges from ${speedRange.min.toFixed(2)} to ${speedRange.max.toFixed(2)}.
+        - The data includes speed, RPM, throttle, brake pressure, acceleration, and steering angle.
+        - Total data points for this lap: ${processedTelemetryForTable.length}
+
+      User Question: ${userQuestion}
+
+      Based on this context and the telemetry data, provide a concise and insightful answer.
+    `;
+
+    const aiResponse = await generateGeminiResponse(prompt);
+    setConversationHistory([...newConversationHistory, { role: 'ai' as const, text: aiResponse }]);
+    setUserQuestion('');
+    setIsSendingMessage(false);
+  };
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -440,6 +590,7 @@ export default function AnalysisPage() {
             </select>
           </div>
         </div>
+      <LapDataDisplay lapData={lapData} />
       <div className={styles.mainGrid}>
         <div className={styles.mapContainer}>
           <RaceMap raceLines={raceLinesForMap} availableDrivers={driversList} selectedLap={selectedLap} speedRange={speedRange} />
@@ -705,12 +856,26 @@ export default function AnalysisPage() {
         <div className={styles.aiPanel}>
           <h3 className={styles.aiPanelTitle}>AI Race Engineer</h3>
           <div className={styles.aiChatBox}>
-            <div className={styles.aiMessage}>Welcome! Ask me anything about this race.</div>
-            <div className={styles.userMessage}>Where is Driver A losing time?</div>
+            {conversationHistory.map((msg, index) => (
+              <div key={index} className={msg.role === 'user' ? styles.userMessage : styles.aiMessage}>
+                {msg.text}
+              </div>
+            ))}
+            {isSendingMessage && <div className={styles.aiMessage}>AI is thinking...</div>}
           </div>
           <div className={styles.aiInputContainer}>
-            <input type="text" placeholder="Ask a question..." className={styles.aiInput} />
-            <button className={styles.aiSendButton}>Send</button>
+            <input
+              type="text"
+              placeholder="Ask a question..."
+              className={styles.aiInput}
+              value={userQuestion}
+              onChange={(e) => setUserQuestion(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+              disabled={isSendingMessage}
+            />
+            <button onClick={handleSendMessage} className={styles.aiSendButton} disabled={isSendingMessage}>
+              Send
+            </button>
           </div>
         </div>
       </div>

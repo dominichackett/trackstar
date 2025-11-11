@@ -60,14 +60,14 @@ export default function Navbar() {
             <Link href="/dashboard" className={`${styles.navLink} ${pathname === '/dashboard' ? styles.active : ''}`}>
               Dashboard
             </Link>
-            <Link href="/races" className={`${styles.navLink} ${pathname === '/races' ? styles.active : ''}`}>
-              Races
-            </Link>
             <Link href="/races/results" className={`${styles.navLink} ${pathname === '/races/results' ? styles.active : ''}`}>
               Race Results
             </Link>
             <Link href="/analysis" className={`${styles.navLink} ${pathname === '/analysis' ? styles.active : ''}`}>
               Analysis
+            </Link>
+            <Link href="/track" className={`${styles.navLink} ${pathname === '/track' ? styles.active : ''}`}>
+              Tracks
             </Link>
             <Link href="/ai-chat" className={`${styles.navLink} ${pathname === '/ai-chat' ? styles.active : ''}`}>
               AI Chat

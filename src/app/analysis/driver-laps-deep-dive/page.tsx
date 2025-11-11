@@ -77,6 +77,45 @@ const intervalToSeconds = (intervalString: string): number => {
   return seconds;
 };
 
+// Environment variables for Gemini API
+const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-pro';
+const GEMINI_API_URL = process.env.NEXT_PUBLIC_GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/';
+
+// Function to call Gemini API
+const generateGeminiResponse = async (prompt: string): Promise<string> => {
+  if (!GEMINI_API_KEY) {
+    console.error('Gemini API key is not set.');
+    return 'Error: Gemini API key is not configured.';
+  }
+
+  try {
+    const response = await fetch(`${GEMINI_API_URL}${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }],
+        }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Gemini API error:', errorData);
+      return `Error from AI: ${errorData.error?.message || 'Unknown error'}`;
+    }
+
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text;
+  } catch (err: any) {
+    console.error('Failed to call Gemini API:', err);
+    return `Error: Failed to connect to AI (${err.message})`;
+  }
+};
+
 export default function DriverLapsDeepDivePage() {
   const supabase = getSupabaseClient();
   const searchParams = useSearchParams();
@@ -107,6 +146,7 @@ export default function DriverLapsDeepDivePage() {
   const [aiInsights, setAiInsights] = useState<string | null>(null);
   const [userQuestion, setUserQuestion] = useState<string>('');
   const [conversationHistory, setConversationHistory] = useState<{ role: 'user' | 'ai', text: string }[]>([]);
+  const [isSendingMessage, setIsSendingMessage] = useState<boolean>(false); // New state for loading indicator
 
   useEffect(() => {
     async function fetchInitialData() {
@@ -203,6 +243,7 @@ export default function DriverLapsDeepDivePage() {
         if (driversError) {
           console.error('Error fetching drivers:', driversError);
           setAvailableDrivers([]);
+          setSelectedDriverId(''); // Clear selectedDriverId on error
           return;
         }
 
@@ -213,14 +254,21 @@ export default function DriverLapsDeepDivePage() {
         }));
         setAvailableDrivers(participatingDrivers);
 
-        // Set selectedDriverId based on initialDriverId or default
-        if (initialDriverId && participatingDrivers.some(driver => driver.id === initialDriverId)) {
-          setSelectedDriverId(initialDriverId);
-        } else if (participatingDrivers.length > 0) {
+        // Check if the currently selected driver is still in the list of participating drivers
+        const isCurrentDriverValid = participatingDrivers.some(driver => driver.id === selectedDriverId);
+
+        if (!isCurrentDriverValid && participatingDrivers.length > 0) {
+          // If the current selected driver is no longer valid, or no driver was selected,
+          // default to the first driver in the new list.
           setSelectedDriverId(participatingDrivers[0].id);
-        } else {
+        } else if (participatingDrivers.length === 0) {
+          // If no drivers are available for the race, clear selectedDriverId
           setSelectedDriverId('');
         }
+        // If isCurrentDriverValid is true, keep the selectedDriverId as is.
+        // If selectedDriverId was initially set from URL and is valid, it will remain.
+        // If user manually selected, it will remain.
+
       } else {
         setAvailableDrivers([]);
         setSelectedDriverId('');
@@ -228,10 +276,12 @@ export default function DriverLapsDeepDivePage() {
     }
 
     fetchDriversForSelectedRace();
-  }, [supabase, selectedRaceId, initialDriverId]);
+  }, [supabase, selectedRaceId, selectedDriverId]); // Added selectedDriverId to dependencies to ensure re-evaluation when it changes.
+
 
   useEffect(() => {
     async function fetchData() {
+      console.log('fetchData useEffect triggered. selectedRaceId:', selectedRaceId, 'selectedDriverId:', selectedDriverId);
       if (!selectedRaceId || !selectedDriverId) {
         // Only set error if user has interacted or if it's not initial load
         if (selectedRaceId || selectedDriverId) { // Check if any input is provided
@@ -246,6 +296,8 @@ export default function DriverLapsDeepDivePage() {
 
       setLoading(true);
       setError(null);
+      setAiInsights(null); // Clear AI insights to regenerate on new selection
+      setConversationHistory([]); // Clear conversation history
 
       try {
         // Fetch Race Info
@@ -402,6 +454,24 @@ export default function DriverLapsDeepDivePage() {
           });
         }
 
+        // --- AI Summary Generation (Moved here) ---
+        if (lapsWithImprovements && driver && race && !isSendingMessage) {
+          setIsSendingMessage(true); // Set loading for AI
+          const driverName = driver.name ? `${driver.name} ` : '';
+          const prompt = `You are an expert race engineer analyzing driver performance.
+          Here is the data for driver ${driverName}(${driver.number}) in race ${race.name}:
+          ${JSON.stringify(lapsWithImprovements, null, 2)}
+
+          Provide a concise summary of the driver's performance in this race. Highlight key strengths, weaknesses, and any notable laps or incidents. Focus on lap times, sector times, consistency, and speed. Keep it under 600 words.`;
+
+          console.log('AI Initial Summary Prompt (from fetchData):', prompt);
+          const summary = await generateGeminiResponse(prompt);
+          setAiInsights(summary);
+          setConversationHistory([{ role: 'ai', text: summary }]);
+          setIsSendingMessage(false); // Clear loading for AI
+        }
+        // --- End AI Summary Generation ---
+
       } catch (err: any) {
         console.error('Error fetching driver laps data:', err);
         setError(err.message || 'An unknown error occurred.');
@@ -409,21 +479,36 @@ export default function DriverLapsDeepDivePage() {
         setLoading(false);
       }
     }
-
     fetchData();
-  }, [selectedRaceId, selectedDriverId, supabase]);
+  }, [selectedRaceId, selectedDriverId, supabase]); // Removed isSendingMessage from dependencies
 
-  if (loading) {
-    return <StatusIndicator loading={true} loadingMessage="Loading driver laps data..." />;
-  }
+  // Removed the separate useEffect for generateInitialSummary
+  // useEffect(() => {
+  //   const generateInitialSummary = async () => {
+  //     console.log('generateInitialSummary useEffect triggered.');
+  //     console.log('allLapsData:', allLapsData);
+  //     console.log('driverInfo:', driverInfo);
+  //     console.log('raceInfo:', raceInfo);
 
-  if (error) {
-    return <StatusIndicator error={true} errorMessage={error} />;
-  }
+  //     if (allLapsData && driverInfo && raceInfo && !isSendingMessage) {
+  //       setIsSendingMessage(true);
+  //       const driverName = driverInfo.name ? `${driverInfo.name} ` : '';
+  //       const prompt = `You are an expert race engineer analyzing driver performance.
+  //       Here is the data for driver ${driverName}(${driverInfo.number}) in race ${raceInfo.name}:
+  //       ${JSON.stringify(allLapsData, null, 2)}
 
-  if (!allLapsData || allLapsData.length === 0) {
-    return <StatusIndicator noDataMessage="No lap data found for this driver in the selected race." data={allLapsData || []} />;
-  }
+  //       Provide a concise summary of the driver's performance in this race. Highlight key strengths, weaknesses, and any notable laps or incidents. Focus on lap times, sector times, consistency, and speed. Keep it under 300 words.`;
+
+  //       console.log('AI Initial Summary Prompt:', prompt);
+  //       const summary = await generateGeminiResponse(prompt);
+  //       setAiInsights(summary);
+  //       setConversationHistory([{ role: 'ai', text: summary }]);
+  //       setIsSendingMessage(false);
+  //     }
+  //   };
+
+  //   generateInitialSummary();
+  // }, [allLapsData, driverInfo, raceInfo, selectedDriverId, selectedRaceId, generateGeminiResponse]); // Added selectedDriverId and selectedRaceId // Removed isSendingMessage from dependencies
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -431,10 +516,30 @@ export default function DriverLapsDeepDivePage() {
     return `${minutes}:${remainingSeconds.padStart(6, '0')}`;
   };
 
-  const formatDelta = (delta: number | null) => {
-    if (delta === null) return 'N/A';
-    const sign = delta >= 0 ? '+' : '';
-    return `${sign}${delta.toFixed(3)}s`;
+  const getDeltaInfo = (delta: number | null) => {
+    if (delta === null || isNaN(delta)) return { text: 'N/A', className: '' };
+
+    const text = `${delta >= 0 ? '+' : ''}${delta.toFixed(3)}s`;
+    let className = '';
+
+    if (delta > 0.001) { // Positive delta means improvement (faster)
+      className = styles['delta-good'];
+    } else if (delta < -0.001) { // Negative delta means regression (slower)
+      className = styles['delta-bad'];
+    } else { // Delta is zero or very close
+      className = styles['delta-neutral'];
+    }
+
+    return { text, className };
+  };
+
+  const getValueStyle = (currentValue: number | null, bestValue: number | null) => {
+    if (bestValue === null || currentValue === null || isNaN(currentValue)) return '';
+    // Use a small tolerance for float comparison
+    if (Math.abs(currentValue - bestValue) < 0.001) {
+        return styles['delta-neutral']; // Highlight the best value
+    }
+    return '';
   };
 
   const handleGoClick = () => {
@@ -448,6 +553,41 @@ export default function DriverLapsDeepDivePage() {
       setError('Please select a race and a driver.');
     }
   };
+
+
+
+  // Function to handle sending messages to AI
+  const handleSendMessage = async () => {
+    if (!userQuestion.trim() || isSendingMessage) return;
+
+    const newUserMessage = { role: 'user' as const, text: userQuestion };
+    setConversationHistory((prev) => [...prev, newUserMessage]);
+    setUserQuestion('');
+    setIsSendingMessage(true);
+
+    const context = `Current conversation: ${conversationHistory.map(msg => `${msg.role}: ${msg.text}`).join('\n')}\nUser: ${newUserMessage.text}`;
+    const prompt = `You are an expert race engineer analyzing driver performance.
+    Here is the data for driver ${driverInfo?.name} (${driverInfo?.number}) in race ${raceInfo?.name}:
+    ${JSON.stringify(allLapsData, null, 2)}
+
+    Based on the provided data and the conversation history, answer the user's question: "${newUserMessage.text}".
+    Keep your response concise and directly address the question.`;
+
+    console.log('AI User Message Prompt:', prompt);
+    const aiResponse = await generateGeminiResponse(prompt);
+    setConversationHistory((prev) => [...prev, { role: 'ai', text: aiResponse }]);
+    setIsSendingMessage(false);
+  };
+
+  if (loading) {
+    return <StatusIndicator loading={true} loadingMessage="Loading driver laps data..." />;
+  }
+
+  if (error) {
+    return <StatusIndicator error={true} errorMessage={error} />;
+  }
+
+
 
   return (
     <div className={styles.container}>
@@ -483,56 +623,93 @@ export default function DriverLapsDeepDivePage() {
         <p><strong>Driver:</strong> {driverInfo?.name || `Driver ${driverInfo?.number}` || selectedDriverId}</p>
       </div>
 
-      {driversBestLapInfo && driversBestLapInfo.lapTime !== null && (
-        <div className={styles.summarySection}>
-          <h2>Driver's Best Lap in Race</h2>
-          <p>
-            <strong>Lap Time:</strong> {driversBestLapInfo.lapTime !== null ? formatTime(driversBestLapInfo.lapTime) : 'N/A'} (Lap {driversBestLapInfo.lapNumber || 'N/A'})
-          </p>
-          <p>
-            <strong>S1:</strong> {driversBestLapInfo.s1 || 'N/A'} | <strong>S2:</strong> {driversBestLapInfo.s2 || 'N/A'} | <strong>S3:</strong> {driversBestLapInfo.s3 || 'N/A'}
-          </p>
-        </div>
-      )}
+      <div className={styles.summaryGrid}>
+        {driversBestLapInfo && driversBestLapInfo.lapTime !== null && (
+          <div className={styles.summarySection}>
+            <h2>Driver's Best Lap</h2>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Lap Time</span>
+              <span className={styles.summaryValue}>
+                {driversBestLapInfo.lapTime !== null ? formatTime(driversBestLapInfo.lapTime) : 'N/A'}
+                <span className={styles.summaryContext}>(Lap {driversBestLapInfo.lapNumber || 'N/A'})</span>
+              </span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>S1</span>
+              <span className={styles.summaryValue}>{driversBestLapInfo.s1 || 'N/A'}</span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>S2</span>
+              <span className={styles.summaryValue}>{driversBestLapInfo.s2 || 'N/A'}</span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>S3</span>
+              <span className={styles.summaryValue}>{driversBestLapInfo.s3 || 'N/A'}</span>
+            </div>
+          </div>
+        )}
 
-      {driversBestSectorsInfo && (driversBestSectorsInfo.s1.time !== null || driversBestSectorsInfo.s2.time !== null || driversBestSectorsInfo.s3.time !== null) && (
-        <div className={styles.summarySection}>
-          <h2>Driver's Best Sectors in Race</h2>
-          <p>
-            <strong>S1:</strong> {driversBestSectorsInfo.s1.time !== null ? formatTime(driversBestSectorsInfo.s1.time) : 'N/A'} (Lap {driversBestSectorsInfo.s1.lapNumber || 'N/A'})
-          </p>
-          <p>
-            <strong>S2:</strong> {driversBestSectorsInfo.s2.time !== null ? formatTime(driversBestSectorsInfo.s2.time) : 'N/A'} (Lap {driversBestSectorsInfo.s2.lapNumber || 'N/A'})
-          </p>
-          <p>
-            <strong>S3:</strong> {driversBestSectorsInfo.s3.time !== null ? formatTime(driversBestSectorsInfo.s3.time) : 'N/A'} (Lap {driversBestSectorsInfo.s3.lapNumber || 'N/A'})
-          </p>
-        </div>
-      )}
+        {driversBestSectorsInfo && (driversBestSectorsInfo.s1.time !== null || driversBestSectorsInfo.s2.time !== null || driversBestSectorsInfo.s3.time !== null) && (
+          <div className={styles.summarySection}>
+            <h2>Driver's Best Sectors</h2>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>S1</span>
+              <span className={styles.summaryValue}>
+                {driversBestSectorsInfo.s1.time !== null ? formatTime(driversBestSectorsInfo.s1.time) : 'N/A'}
+                <span className={styles.summaryContext}>(Lap {driversBestSectorsInfo.s1.lapNumber || 'N/A'})</span>
+              </span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>S2</span>
+              <span className={styles.summaryValue}>
+                {driversBestSectorsInfo.s2.time !== null ? formatTime(driversBestSectorsInfo.s2.time) : 'N/A'}
+                <span className={styles.summaryContext}>(Lap {driversBestSectorsInfo.s2.lapNumber || 'N/A'})</span>
+              </span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>S3</span>
+              <span className={styles.summaryValue}>
+                {driversBestSectorsInfo.s3.time !== null ? formatTime(driversBestSectorsInfo.s3.time) : 'N/A'}
+                <span className={styles.summaryContext}>(Lap {driversBestSectorsInfo.s3.lapNumber || 'N/A'})</span>
+              </span>
+            </div>
+          </div>
+        )}
 
-      {(driversAverageLapTime !== null || driversLapTimeStandardDeviation !== null) && (
-        <div className={styles.summarySection}>
-          <h2>Driver's Lap Time Statistics</h2>
-          <p>
-            <strong>Average Lap Time:</strong> {driversAverageLapTime !== null ? formatTime(driversAverageLapTime) : 'N/A'}
-          </p>
-          <p>
-            <strong>Consistency (Std Dev):</strong> {driversLapTimeStandardDeviation !== null ? driversLapTimeStandardDeviation.toFixed(3) + 's' : 'N/A'}
-          </p>
-        </div>
-      )}
+        {(driversAverageLapTime !== null || driversLapTimeStandardDeviation !== null) && (
+          <div className={styles.summarySection}>
+            <h2>Lap Time Statistics</h2>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Average Lap Time</span>
+              <span className={styles.summaryValue}>{driversAverageLapTime !== null ? formatTime(driversAverageLapTime) : 'N/A'}</span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Consistency (Std Dev)</span>
+              <span className={styles.summaryValue}>{driversLapTimeStandardDeviation !== null ? driversLapTimeStandardDeviation.toFixed(3) + 's' : 'N/A'}</span>
+            </div>
+          </div>
+        )}
 
-      {(driversBestTopSpeedInfo && driversBestTopSpeedInfo.speed !== null) || (driversBestKPHInfo && driversBestKPHInfo.kph !== null) ? (
-        <div className={styles.summarySection}>
-          <h2>Driver's Speed Statistics</h2>
-          <p>
-            <strong>Best Top Speed:</strong> {driversBestTopSpeedInfo?.speed !== null ? driversBestTopSpeedInfo?.speed.toFixed(2) + ' KPH' : 'N/A'} (Lap {driversBestTopSpeedInfo?.lapNumber || 'N/A'})
-          </p>
-          <p>
-            <strong>Best Average KPH:</strong> {driversBestKPHInfo?.kph !== null ? driversBestKPHInfo?.kph.toFixed(2) + ' KPH' : 'N/A'} (Lap {driversBestKPHInfo?.lapNumber || 'N/A'})
-          </p>
-        </div>
-      ) : null}
+        {(driversBestTopSpeedInfo && driversBestTopSpeedInfo.speed !== null) || (driversBestKPHInfo && driversBestKPHInfo.kph !== null) ? (
+          <div className={styles.summarySection}>
+            <h2>Speed Statistics</h2>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Best Top Speed</span>
+              <span className={styles.summaryValue}>
+                {driversBestTopSpeedInfo?.speed !== null ? driversBestTopSpeedInfo?.speed.toFixed(2) + ' KPH' : 'N/A'}
+                <span className={styles.summaryContext}>(Lap {driversBestTopSpeedInfo?.lapNumber || 'N/A'})</span>
+              </span>
+            </div>
+            <div className={styles.summaryItem}>
+              <span className={styles.summaryLabel}>Best Average KPH</span>
+              <span className={styles.summaryValue}>
+                {driversBestKPHInfo?.kph !== null ? driversBestKPHInfo?.kph.toFixed(2) + ' KPH' : 'N/A'}
+                <span className={styles.summaryContext}>(Lap {driversBestKPHInfo?.lapNumber || 'N/A'})</span>
+              </span>
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       <div className={styles.tableContainer}>
         <h2>All Laps for Driver {driverInfo?.number} in {raceInfo?.name}</h2>
@@ -554,22 +731,29 @@ export default function DriverLapsDeepDivePage() {
             </tr>
           </thead>
           <tbody>
-            {allLapsData.map(lap => (
-              <tr key={lap.id}>
-                <td>{lap.lap_number}</td>
-                <td>{lap.lap_time}</td>
-                <td>{lap.s1}</td>
-                <td>{lap.s2}</td>
-                <td>{lap.s3}</td>
-                <td>{lap.kph?.toFixed(2) || 'N/A'}</td>
-                <td>{lap.top_speed?.toFixed(2) || 'N/A'}</td>
-                <td>{lap.lap_improvement !== null ? formatDelta(lap.lap_improvement) : 'N/A'}</td>
-                <td>{lap.s1_improvement !== null ? formatDelta(lap.s1_improvement) : 'N/A'}</td>
-                <td>{lap.s2_improvement !== null ? formatDelta(lap.s2_improvement) : 'N/A'}</td>
-                <td>{lap.s3_improvement !== null ? formatDelta(lap.s3_improvement) : 'N/A'}</td>
-                <td>{lap.flag_at_fl || 'N/A'}</td>
-              </tr>
-            ))}
+            {(allLapsData || []).map(lap => {
+              const lapImprovementInfo = getDeltaInfo(lap.lap_improvement);
+              const s1ImprovementInfo = getDeltaInfo(lap.s1_improvement);
+              const s2ImprovementInfo = getDeltaInfo(lap.s2_improvement);
+              const s3ImprovementInfo = getDeltaInfo(lap.s3_improvement);
+
+              return (
+                <tr key={lap.id}>
+                  <td>{lap.lap_number}</td>
+                  <td className={getValueStyle(intervalToSeconds(lap.lap_time), driversBestLapInfo?.lapTime ?? null)}>{lap.lap_time}</td>
+                  <td className={getValueStyle(lap.s1_seconds, driversBestSectorsInfo?.s1.time ?? null)}>{lap.s1}</td>
+                  <td className={getValueStyle(lap.s2_seconds, driversBestSectorsInfo?.s2.time ?? null)}>{lap.s2}</td>
+                  <td className={getValueStyle(lap.s3_seconds, driversBestSectorsInfo?.s3.time ?? null)}>{lap.s3}</td>
+                  <td className={getValueStyle(lap.kph, driversBestKPHInfo?.kph ?? null)}>{lap.kph?.toFixed(2) || 'N/A'}</td>
+                  <td className={getValueStyle(lap.top_speed, driversBestTopSpeedInfo?.speed ?? null)}>{lap.top_speed?.toFixed(2) || 'N/A'}</td>
+                  <td className={lapImprovementInfo.className}>{lapImprovementInfo.text}</td>
+                  <td className={s1ImprovementInfo.className}>{s1ImprovementInfo.text}</td>
+                  <td className={s2ImprovementInfo.className}>{s2ImprovementInfo.text}</td>
+                  <td className={s3ImprovementInfo.className}>{s3ImprovementInfo.text}</td>
+                  <td>{lap.flag_at_fl || 'N/A'}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -585,6 +769,12 @@ export default function DriverLapsDeepDivePage() {
           <li><strong>Lap Impr.</strong>: Improvement in total lap time compared to the previous lap. A positive value means a faster lap.</li>
           <li><strong>S1 Impr., S2 Impr., S3 Impr.</strong>: Improvement in Sector 1, 2, and 3 times compared to the previous respective sector times. A positive value means a faster sector.</li>
           <li><strong>Flag at FL</strong>: Indicates the flag status at the finish line (e.g., 'Green', 'Yellow', 'Chequered').</li>
+        </ul>
+        <h3>Color Legend:</h3>
+        <ul>
+          <li style={{ color: '#28a745' }}><strong>Green:</strong> Indicates an improvement (faster time) compared to the previous lap.</li>
+          <li style={{ color: '#FF0000' }}><strong>Bright Red:</strong> Indicates a regression (slower time) compared to the previous lap.</li>
+          <li style={{ color: '#FFFF00' }}><strong>Bright Yellow:</strong> Highlights the driver's best performance for that specific metric (e.g., fastest lap time, fastest S1, highest KPH) across all laps in the race.</li>
         </ul>
       </div>
 
@@ -608,11 +798,12 @@ export default function DriverLapsDeepDivePage() {
             onChange={(e) => setUserQuestion(e.target.value)}
             onKeyPress={(e) => {
               if (e.key === 'Enter') {
-                // handleSendMessage(); // This function will be implemented later
+                handleSendMessage();
               }
             }}
+            disabled={isSendingMessage} // Disable input while sending
           />
-          <button className={styles.aiSendButton} onClick={() => { /* handleSendMessage(); */ }}>Send</button>
+          <button className={styles.aiSendButton} onClick={handleSendMessage} disabled={isSendingMessage}>Send</button>
         </div>
       </div>
     </div>
