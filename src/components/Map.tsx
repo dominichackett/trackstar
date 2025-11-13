@@ -33,6 +33,8 @@ interface MapProps {
   availableDrivers: { id: string; name: string; }[];
   selectedLap: string;
   speedRange: {min: number, max: number};
+  selectedDataPoints: string[];
+  telemetryPath: TelemetryPoint[];
 }
 
 function MapUpdater({ raceLines }: { raceLines: Record<string, TelemetryPoint[]> }) {
@@ -59,7 +61,19 @@ const getColorForSpeed = (speed: number, minSpeed: number, maxSpeed: number) => 
   return `hsl(${hue}, 100%, 50%)`;
 };
 
-export default function RaceMap({ raceLines, availableDrivers, selectedLap, speedRange }: MapProps) {
+const blackIcon = new L.Icon({
+  iconUrl: '/marker-icon.png', // Using the default and coloring it via CSS filter
+  iconRetinaUrl: '/marker-icon-2x.png',
+  shadowUrl: '/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+  className: 'black-marker' // We'll use this class to apply a CSS filter
+});
+
+
+export default function RaceMap({ raceLines, availableDrivers, selectedLap, speedRange, selectedDataPoints, telemetryPath }: MapProps) {
   console.log('RaceMap received raceLines:', raceLines);
   // Find the first available race line to set the initial center
   const firstDriverId = Object.keys(raceLines)[0];
@@ -67,8 +81,17 @@ export default function RaceMap({ raceLines, availableDrivers, selectedLap, spee
     ? [raceLines[firstDriverId][0].lat, raceLines[firstDriverId][0].lon] as [number, number]
     : [33.59, -86.79] as [number, number]; // Default center if no race lines
 
+  const selectedPointsToRender = telemetryPath.filter(p => selectedDataPoints.includes(p.timestamp));
+
   return (
     <MapContainer center={center} zoom={15} style={{ height: '100%', width: '100%' }}>
+      <style>
+        {`
+          .black-marker {
+            filter: invert(100%) grayscale(100%) brightness(0%);
+          }
+        `}
+      </style>
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -115,6 +138,21 @@ export default function RaceMap({ raceLines, availableDrivers, selectedLap, spee
           </div>
         )
       })}
+      {selectedPointsToRender.map((dataPoint, index) => (
+        <Marker key={`selected-${index}`} position={[dataPoint.lat, dataPoint.lon]} icon={blackIcon}>
+          <Popup>
+            <div>
+              <h3>Selected Telemetry Point</h3>
+              <p><strong>Lap:</strong> {selectedLap} | <strong>Time:</strong> {new Date(dataPoint.timestamp).toLocaleTimeString()}</p>
+              <p><strong>Speed:</strong> {dataPoint.speed?.toFixed(2)} km/h | <strong>RPM:</strong> {dataPoint.rpm?.toFixed(0)}</p>
+              <p><strong>Throttle:</strong> {dataPoint.throttle?.toFixed(2)} | <strong>Accel Pedal:</strong> {dataPoint.accelPedal?.toFixed(2)}</p>
+              <p><strong>Brake (F/R):</strong> {dataPoint.brakeF?.toFixed(2)} / {dataPoint.brakeR?.toFixed(2)}</p>
+              <p><strong>Accel (X/Y):</strong> {dataPoint.accelX?.toFixed(2)} / {dataPoint.accelY?.toFixed(2)}</p>
+              <p><strong>Steering:</strong> {dataPoint.steeringAngle?.toFixed(2)} | <strong>Lap Dist:</strong> {dataPoint.lapDist?.toFixed(2)} m</p>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
       <MapUpdater raceLines={raceLines} />
     </MapContainer>
   );

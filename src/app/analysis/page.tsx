@@ -96,6 +96,7 @@ export default function AnalysisPage() {
   const [isSendingMessage, setIsSendingMessage] = useState<boolean>(false); // New state for loading indicator
   const [initialAnalysisDone, setInitialAnalysisDone] = useState<boolean>(false);
   const [lapData, setLapData] = useState<any>(null);
+  const [selectedDataPoints, setSelectedDataPoints] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchRaces = async () => {
@@ -263,7 +264,7 @@ export default function AnalysisPage() {
           telemetryPath.push({
             lat: lat,
             lon: lon,
-            timestamp: d.timestamp,
+            timestamp: d.timestamp.toISOString(),
             speed: d[`${driverNumber}_speed`],
             rpm: d[`${driverNumber}_nmot`],
             throttle: d[`${driverNumber}_ath`],
@@ -365,17 +366,18 @@ export default function AnalysisPage() {
         const driverName = driversList.find(d => d.id === selectedDriver)?.name || 'Unknown Driver';
         const raceName = racesList.find(r => r.id === selectedRace)?.name || 'Unknown Race';
 
+        // Prepare telemetry for the prompt (no truncation as per user request)
+        const telemetryToSend = processedTelemetryForTable;
+
         const prompt = `
-          You are an AI Race Engineer. Provide a brief, insightful overview of the driver's performance on this lap based on the following summary.
+          You are an AI Race Engineer. Provide a brief, insightful overview of the driver's performance on this lap based on the following data.
           Context:
           - Race: ${raceName}
           - Driver: ${driverName}
           - Lap Number: ${selectedLap}
           - Lap Data: ${JSON.stringify(lapData, null, 2)}
-          - Telemetry Data Summary:
-            - Speed ranges from ${speedRange.min.toFixed(2)} to ${speedRange.max.toFixed(2)}.
-            - The data includes speed, RPM, throttle, brake pressure, acceleration, and steering angle.
-            - Total data points for this lap: ${processedTelemetryForTable.length}
+          
+          - Telemetry Data: ${JSON.stringify(telemetryToSend, null, 2)}
 
           What are the key takeaways from this lap?
         `;
@@ -388,12 +390,25 @@ export default function AnalysisPage() {
     };
 
     getInitialAnalysis();
-  }, [processedTelemetryForTable, initialAnalysisDone, selectedDriver, selectedLap, selectedRace, driversList, racesList, speedRange, lapData]);
+  }, [processedTelemetryForTable, initialAnalysisDone, selectedDriver, selectedLap, selectedRace, driversList, racesList, lapData]);
 
   useEffect(() => {
     setInitialAnalysisDone(false);
     setConversationHistory([{ role: 'ai', text: 'Welcome! Ask me anything about this race.' }]);
+    setSelectedDataPoints([]); // Clear selections when context changes
   }, [selectedRace, selectedLap, selectedDriver]);
+
+  const handleDataPointSelect = (timestamp: string) => {
+    setSelectedDataPoints(prev => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(timestamp)) {
+        newSelection.delete(timestamp);
+      } else {
+        newSelection.add(timestamp);
+      }
+      return Array.from(newSelection);
+    });
+  };
 
   const handleDriverChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedDriver(event.target.value);
@@ -502,6 +517,8 @@ export default function AnalysisPage() {
     const driverName = driversList.find(d => d.id === selectedDriver)?.name || 'Unknown Driver';
     const raceName = racesList.find(r => r.id === selectedRace)?.name || 'Unknown Race';
 
+            // Prepare telemetry for the prompt (no truncation as per user request)
+            const telemetryToSend = processedTelemetryForTable;
     // Constructing a detailed prompt
     const prompt = `
       You are an AI Race Engineer. Analyze the following data and answer the user's question.
@@ -510,10 +527,8 @@ export default function AnalysisPage() {
       - Driver: ${driverName} (ID: ${selectedDriver})
       - Lap Number: ${selectedLap}
       - Lap Data: ${JSON.stringify(lapData, null, 2)}
-      - Telemetry Data Summary:
-        - Speed ranges from ${speedRange.min.toFixed(2)} to ${speedRange.max.toFixed(2)}.
-        - The data includes speed, RPM, throttle, brake pressure, acceleration, and steering angle.
-        - Total data points for this lap: ${processedTelemetryForTable.length}
+
+      - Telemetry Data: ${JSON.stringify(telemetryToSend, null, 2)}
 
       User Question: ${userQuestion}
 
@@ -593,7 +608,14 @@ export default function AnalysisPage() {
       <LapDataDisplay lapData={lapData} />
       <div className={styles.mainGrid}>
         <div className={styles.mapContainer}>
-          <RaceMap raceLines={raceLinesForMap} availableDrivers={driversList} selectedLap={selectedLap} speedRange={speedRange} />
+          <RaceMap 
+            raceLines={raceLinesForMap} 
+            availableDrivers={driversList} 
+            selectedLap={selectedLap} 
+            speedRange={speedRange}
+            selectedDataPoints={selectedDataPoints}
+            telemetryPath={raceLinesForMap[selectedDriver] || []}
+          />
         </div>
 
                                 <div className={styles.chartsContainer}>
@@ -791,6 +813,7 @@ export default function AnalysisPage() {
           <table className={styles.table}>
             <thead>
               <tr>
+                <th>Plot</th>
                 <th>Timestamp</th>
                 <th>Speed</th>
                 <th>RPM</th>
@@ -811,9 +834,17 @@ export default function AnalysisPage() {
                   const driver = driversList.find(d => d.id === selectedDriver);
                   const driverNumber = driver ? driver.number : null;
                   if (!driverNumber) return null;
+                  const timestamp = new Date(dataPoint.timestamp).toISOString();
 
                   return (
                     <tr key={index}>
+                      <td>
+                        <input 
+                          type="checkbox"
+                          checked={selectedDataPoints.includes(timestamp)}
+                          onChange={() => handleDataPointSelect(timestamp)}
+                        />
+                      </td>
                       <td>{new Date(dataPoint.timestamp).toLocaleTimeString()}</td>
                       <td>{dataPoint[`${driverNumber}_speed`]?.toFixed(2)}</td>
                       <td>{dataPoint[`${driverNumber}_nmot`]?.toFixed(0)}</td>
