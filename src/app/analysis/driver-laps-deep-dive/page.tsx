@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { getSupabaseClient } from '@/utils/supabase/client';
 import styles from './page.module.css'; // Assuming a new CSS module for this page
 import StatusIndicator from '@/components/StatusIndicator';
+import WeatherSummaryCard from '@/components/WeatherSummaryCard';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
 
 interface LapData {
   id: string;
@@ -59,6 +61,15 @@ interface Driver {
 interface Race {
   id: string;
   name: string;
+}
+
+interface WeatherData {
+  avgAirTemp: number | null;
+  avgTrackTemp: number | null;
+  avgHumidity: number | null;
+  avgWindSpeed: number | null;
+  avgPressure: number | null;
+  rainStatus: string;
 }
 
 const intervalToSeconds = (intervalString: string): number => {
@@ -141,6 +152,9 @@ export default function DriverLapsDeepDivePage() {
   const [driversBestKPHInfo, setDriversBestKPHInfo] = useState<{ kph: number | null, lapNumber: number | null } | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [loadingWeather, setLoadingWeather] = useState<boolean>(false);
+  const [errorWeather, setErrorWeather] = useState<string | null>(null);
 
   // AI Race Engineer states
   const [aiInsights, setAiInsights] = useState<string | null>(null);
@@ -482,6 +496,62 @@ export default function DriverLapsDeepDivePage() {
     fetchData();
   }, [selectedRaceId, selectedDriverId, supabase]); // Removed isSendingMessage from dependencies
 
+  useEffect(() => {
+    const fetchWeatherData = async () => {
+      if (!selectedRaceId) {
+        setWeatherData(null);
+        return;
+      }
+
+      setLoadingWeather(true);
+      setErrorWeather(null);
+
+      const { data, error } = await supabase
+        .from('weather')
+        .select('air_temp, track_temp, humidity, wind_speed, rain, pressure')
+        .eq('race_id', selectedRaceId)
+        .order('time_utc_seconds', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching weather data:', error);
+        setErrorWeather(error.message);
+        setWeatherData(null);
+      } else if (data && data.length > 0) {
+        const totalAirTemp = data.reduce((sum, row) => sum + row.air_temp, 0);
+        const totalTrackTemp = data.reduce((sum, row) => sum + row.track_temp, 0);
+        const totalHumidity = data.reduce((sum, row) => sum + row.humidity, 0);
+        const totalWindSpeed = data.reduce((sum, row) => sum + row.wind_speed, 0);
+        const totalRain = data.reduce((sum, row) => sum + row.rain, 0);
+        const totalPressure = data.reduce((sum, row) => sum + row.pressure, 0);
+
+        const avgAirTemp = totalAirTemp / data.length;
+        const avgTrackTemp = totalTrackTemp / data.length;
+        const avgHumidity = totalHumidity / data.length;
+        const avgWindSpeed = totalWindSpeed / data.length;
+        const avgPressure = totalPressure / data.length;
+
+        let rainStatus = 'No Rain';
+        if (totalRain > 0) {
+          rainStatus = totalRain === data.length ? 'Constant Rain' : 'Intermittent Rain';
+        }
+
+        setWeatherData({
+          avgAirTemp: parseFloat(avgAirTemp.toFixed(1)),
+          avgTrackTemp: parseFloat(avgTrackTemp.toFixed(1)),
+          avgHumidity: parseFloat(avgHumidity.toFixed(1)),
+          avgWindSpeed: parseFloat(avgWindSpeed.toFixed(1)),
+          avgPressure: parseFloat(avgPressure.toFixed(1)),
+          rainStatus: rainStatus,
+        });
+      } else {
+        setWeatherData(null); // No weather data found
+      }
+      setLoadingWeather(false);
+    };
+
+    fetchWeatherData();
+  }, [selectedRaceId, supabase]);
+
   // Removed the separate useEffect for generateInitialSummary
   // useEffect(() => {
   //   const generateInitialSummary = async () => {
@@ -569,6 +639,7 @@ export default function DriverLapsDeepDivePage() {
     const prompt = `You are an expert race engineer analyzing driver performance.
     Here is the data for driver ${driverInfo?.name} (${driverInfo?.number}) in race ${raceInfo?.name}:
     ${JSON.stringify(allLapsData, null, 2)}
+    Weather Summary: ${JSON.stringify(weatherData, null, 2)}
 
     Based on the provided data and the conversation history, answer the user's question: "${newUserMessage.text}".
     Keep your response concise and directly address the question.`;
@@ -622,6 +693,8 @@ export default function DriverLapsDeepDivePage() {
         <p><strong>Race:</strong> {raceInfo?.name || selectedRaceId}</p>
         <p><strong>Driver:</strong> {driverInfo?.name || `Driver ${driverInfo?.number}` || selectedDriverId}</p>
       </div>
+
+      <WeatherSummaryCard weather={weatherData} loading={loadingWeather} error={errorWeather} />
 
       <div className={styles.summaryGrid}>
         {driversBestLapInfo && driversBestLapInfo.lapTime !== null && (
@@ -782,10 +855,10 @@ export default function DriverLapsDeepDivePage() {
       <div className={styles.aiPanel}>
         <h3 className={styles.aiPanelTitle}>AI Race Engineer</h3>
         <div className={styles.aiChatBox}>
-          {aiInsights && <div className={styles.aiMessage}>{aiInsights}</div>}
+          {aiInsights && <div className={styles.aiMessage}><MarkdownRenderer content={aiInsights} /></div>}
           {conversationHistory.map((msg, index) => (
             <div key={index} className={msg.role === 'ai' ? styles.aiMessage : styles.userMessage}>
-              {msg.text}
+              {msg.role === 'ai' ? <MarkdownRenderer content={msg.text} /> : msg.text}
             </div>
           ))}
         </div>

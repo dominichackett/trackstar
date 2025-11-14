@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { getSupabaseClient } from '@/utils/supabase/client';
 import styles from './page.module.css';
 import StatusIndicator from '@/components/StatusIndicator';
+import WeatherSummaryCard from '@/components/WeatherSummaryCard';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
 
 interface LapData {
   id: string;
@@ -68,6 +70,15 @@ interface Driver {
 interface Race {
   id: string;
   name: string;
+}
+
+interface WeatherData {
+  avgAirTemp: number | null;
+  avgTrackTemp: number | null;
+  avgHumidity: number | null;
+  avgWindSpeed: number | null;
+  avgPressure: number | null;
+  rainStatus: string;
 }
 
 interface RaceResult {
@@ -175,6 +186,9 @@ export default function LapDeepDivePage() {
   const [allDrivers, setAllDrivers] = useState<Driver[] | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [loadingWeather, setLoadingWeather] = useState<boolean>(false);
+  const [errorWeather, setErrorWeather] = useState<string | null>(null);
 
   // AI Race Engineer states
   const [aiInsights, setAiInsights] = useState<string | null>(null);
@@ -498,8 +512,8 @@ export default function LapDeepDivePage() {
           // --- AI Summary Generation ---
           if (!isSendingMessage) {
             setIsSendingMessage(true);
-            const prompt = `You are an expert race engineer analyzing lap performance.\n            Here is the data for lap number ${inputLapNumber} in race ${race.name}:\n            ${JSON.stringify(lapsWithDeltas, null, 2)}\n            ${JSON.stringify(drivers, null, 2)}\n
-            Provide a concise summary of the performance of all drivers on this lap. Highlight key strengths, weaknesses, and any notable aspects. Focus on lap times, sector times, consistency, and speed relative to each other. Keep it under 600 words.`;
+            const prompt = `You are a world leading expert race engineer analyzing lap performance.\n            Here is the data for lap number ${inputLapNumber} in race ${race.name}:\n            ${JSON.stringify(lapsWithDeltas, null, 2)}\n            ${JSON.stringify(drivers, null, 2)}\n
+            Provide a concise summary of the performance of all drivers on this lap. Highlight key strengths, weaknesses, and any notable aspects. Focus on lap times, sector times, consistency, and speed relative to each other. Keep it under 600 words. Don't reference driver ids use the driver number.`;
 
             const summary = await generateGeminiResponse(prompt);
             setAiInsights(summary);
@@ -522,6 +536,62 @@ export default function LapDeepDivePage() {
 
     fetchData();
   }, [selectedRaceId, inputLapNumber, supabase]);
+
+  useEffect(() => {
+    const fetchWeatherData = async () => {
+      if (!selectedRaceId) {
+        setWeatherData(null);
+        return;
+      }
+
+      setLoadingWeather(true);
+      setErrorWeather(null);
+
+      const { data, error } = await supabase
+        .from('weather')
+        .select('air_temp, track_temp, humidity, wind_speed, rain, pressure')
+        .eq('race_id', selectedRaceId)
+        .order('time_utc_seconds', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching weather data:', error);
+        setErrorWeather(error.message);
+        setWeatherData(null);
+      } else if (data && data.length > 0) {
+        const totalAirTemp = data.reduce((sum, row) => sum + row.air_temp, 0);
+        const totalTrackTemp = data.reduce((sum, row) => sum + row.track_temp, 0);
+        const totalHumidity = data.reduce((sum, row) => sum + row.humidity, 0);
+        const totalWindSpeed = data.reduce((sum, row) => sum + row.wind_speed, 0);
+        const totalRain = data.reduce((sum, row) => sum + row.rain, 0);
+        const totalPressure = data.reduce((sum, row) => sum + row.pressure, 0);
+
+        const avgAirTemp = totalAirTemp / data.length;
+        const avgTrackTemp = totalTrackTemp / data.length;
+        const avgHumidity = totalHumidity / data.length;
+        const avgWindSpeed = totalWindSpeed / data.length;
+        const avgPressure = totalPressure / data.length;
+
+        let rainStatus = 'No Rain';
+        if (totalRain > 0) {
+          rainStatus = totalRain === data.length ? 'Constant Rain' : 'Intermittent Rain';
+        }
+
+        setWeatherData({
+          avgAirTemp: parseFloat(avgAirTemp.toFixed(1)),
+          avgTrackTemp: parseFloat(avgTrackTemp.toFixed(1)),
+          avgHumidity: parseFloat(avgHumidity.toFixed(1)),
+          avgWindSpeed: parseFloat(avgWindSpeed.toFixed(1)),
+          avgPressure: parseFloat(avgPressure.toFixed(1)),
+          rainStatus: rainStatus,
+        });
+      } else {
+        setWeatherData(null); // No weather data found
+      }
+      setLoadingWeather(false);
+    };
+
+    fetchWeatherData();
+  }, [selectedRaceId, supabase]);
 
   if (loading) {
     return <StatusIndicator loading={true} loadingMessage="Loading lap deep dive data..." />;
@@ -597,6 +667,7 @@ export default function LapDeepDivePage() {
     Here is the data for lap number ${inputLapNumber} in race ${raceInfo?.name}:
     ${JSON.stringify(allLapsData, null, 2)}
     ${JSON.stringify(allDrivers, null, 2)}
+    Weather Summary: ${JSON.stringify(weatherData, null, 2)}
 
     Based on the provided data and the conversation history, answer the user's question: "${newUserMessage.text}".
     Keep your response concise and directly address the question.`;
@@ -639,6 +710,8 @@ export default function LapDeepDivePage() {
         <p><strong>Race:</strong> {raceInfo?.name || selectedRaceId}</p>
         <p><strong>Lap Number:</strong> {inputLapNumber}</p>
       </div>
+
+      <WeatherSummaryCard weather={weatherData} loading={loadingWeather} error={errorWeather} />
 
       <div className={styles.summaryGrid}>
         {raceWinnerInfo && (
@@ -817,10 +890,10 @@ export default function LapDeepDivePage() {
       <div className={styles.aiPanel}>
         <h3 className={styles.aiPanelTitle}>AI Race Engineer</h3>
         <div className={styles.aiChatBox}>
-          {aiInsights && <div className={styles.aiMessage}>{aiInsights}</div>}
+          {aiInsights && <div className={styles.aiMessage}><MarkdownRenderer content={aiInsights} /></div>}
           {conversationHistory.map((msg, index) => (
             <div key={index} className={msg.role === 'ai' ? styles.aiMessage : styles.userMessage}>
-              {msg.text}
+              {msg.role === 'ai' ? <MarkdownRenderer content={msg.text} /> : msg.text}
             </div>
           ))}
         </div>

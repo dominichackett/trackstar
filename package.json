@@ -20,7 +20,9 @@
     "papaparse": "^5.5.3",
     "pg": "^8.11.3",
     "react-leaflet": "^5.0.0",
+    "react-markdown": "^10.1.0",
     "recharts": "^3.3.0",
+    "remark-gfm": "^4.0.1",
     "uuid": "^9.0.1"
   },
   "devDependencies": {

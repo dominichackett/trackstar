@@ -211,19 +211,20 @@
 }
 
 .aiPanel {
-  background-color: #2a2a2a;
+  background-color: #1a1a1a;
   padding: 20px;
   border-radius: 8px;
   margin-top: 30px;
-  border-left: 5px solid #ffc107; /* Yellow for AI */
+  border-left: 4px solid var(--trackstar-red); /* Red for AI */
 }
 
 .aiPanelTitle {
-  color: #ffc107;
+  color: var(--trackstar-red);
   margin-top: 0;
-  margin-bottom: 15px;
-  font-size: 2em;
-  text-align: center;
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  text-align: left;
+  padding-left: 1rem;
 }
 
 .aiChatBox {
@@ -233,29 +234,33 @@
   padding: 15px;
   max-height: 300px;
   overflow-y: auto;
-  margin-bottom: 15px;
+  margin-bottom: 1rem;
   display: flex;
   flex-direction: column;
 }
 
-.aiMessage {
-  background-color: #3a3a3a;
-  color: #e0e0e0;
-  padding: 10px;
-  border-radius: 5px;
-  margin-bottom: 10px;
-  align-self: flex-start;
+.aiMessage, .userMessage {
+  padding: 0.8rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
   max-width: 80%;
 }
 
+.aiMessage {
+  background-color: #2a2a2a;
+  color: var(--trackstar-white);
+  align-self: flex-start;
+}
+
+.aiMessage strong {
+  color: var(--trackstar-red);
+}
+
 .userMessage {
-  background-color: #007bff;
-  color: white;
-  padding: 10px;
-  border-radius: 5px;
-  margin-bottom: 10px;
+  background-color: var(--trackstar-red);
+  color: var(--trackstar-white);
   align-self: flex-end;
-  max-width: 80%;
+  margin-left: auto;
 }
 
 .aiInputContainer {
@@ -267,33 +272,31 @@
   flex-grow: 1;
   padding: 10px 15px;
   border-radius: 5px;
-  border: 1px solid #007bff;
-  background-color: #1a1a1a;
+  border: 1px solid #555;
+  background-color: #333;
   color: #e0e0e0;
   font-size: 1em;
 }
 
 .aiInput:focus {
   outline: none;
-  border-color: #0056b3;
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+  border-color: var(--trackstar-red);
+  box-shadow: none;
 }
 
 .aiSendButton {
   padding: 10px 20px;
   border-radius: 5px;
   border: none;
-  background-color: #007bff;
-  color: white;
+  background-color: var(--trackstar-red);
+  color: var(--trackstar-white);
   font-size: 1em;
   cursor: pointer;
   transition: background-color 0.2s ease-in-out;
 }
 
 .aiSendButton:hover {
-
-  background-color: #0056b3;
-
+  background-color: var(--trackstar-red-dark);
 }
 
 

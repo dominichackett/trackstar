@@ -9,10 +9,21 @@ import 'leaflet/dist/leaflet.css';
 import StatusIndicator from '@/components/StatusIndicator';
 import { getSupabaseClient } from '@/utils/supabase/client';
 import LapDataDisplay from '@/components/LapDataDisplay';
+import WeatherSummaryCard from '@/components/WeatherSummaryCard';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
 
 interface Race {
   id: string;
   name: string;
+}
+
+interface WeatherData {
+  avgAirTemp: number | null;
+  avgTrackTemp: number | null;
+  avgHumidity: number | null;
+  avgWindSpeed: number | null;
+  avgPressure: number | null;
+  rainStatus: string;
 }
 
 // Environment variables for Gemini API
@@ -86,6 +97,9 @@ export default function AnalysisPage() {
   const itemsPerPage = 40;
   const [loadingTelemetry, setLoadingTelemetry] = useState<boolean>(false);
   const [errorTelemetry, setErrorTelemetry] = useState<string | null>(null);
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [loadingWeather, setLoadingWeather] = useState<boolean>(false);
+  const [errorWeather, setErrorWeather] = useState<string | null>(null);
 
   // AI Race Engineer states
   const [aiInsights, setAiInsights] = useState<string | null>(null);
@@ -177,6 +191,62 @@ export default function AnalysisPage() {
 
     fetchLapsAndDrivers();
   }, [selectedRace]);
+
+  useEffect(() => {
+    const fetchWeatherData = async () => {
+      if (!selectedRace) {
+        setWeatherData(null);
+        return;
+      }
+
+      setLoadingWeather(true);
+      setErrorWeather(null);
+
+      const { data, error } = await supabase
+        .from('weather')
+        .select('air_temp, track_temp, humidity, wind_speed, rain, pressure')
+        .eq('race_id', selectedRace)
+        .order('time_utc_seconds', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching weather data:', error);
+        setErrorWeather(error.message);
+        setWeatherData(null);
+      } else if (data && data.length > 0) {
+        const totalAirTemp = data.reduce((sum, row) => sum + row.air_temp, 0);
+        const totalTrackTemp = data.reduce((sum, row) => sum + row.track_temp, 0);
+        const totalHumidity = data.reduce((sum, row) => sum + row.humidity, 0);
+        const totalWindSpeed = data.reduce((sum, row) => sum + row.wind_speed, 0);
+        const totalRain = data.reduce((sum, row) => sum + row.rain, 0);
+        const totalPressure = data.reduce((sum, row) => sum + row.pressure, 0);
+
+        const avgAirTemp = totalAirTemp / data.length;
+        const avgTrackTemp = totalTrackTemp / data.length;
+        const avgHumidity = totalHumidity / data.length;
+        const avgWindSpeed = totalWindSpeed / data.length;
+        const avgPressure = totalPressure / data.length;
+
+        let rainStatus = 'No Rain';
+        if (totalRain > 0) {
+          rainStatus = totalRain === data.length ? 'Constant Rain' : 'Intermittent Rain';
+        }
+
+        setWeatherData({
+          avgAirTemp: parseFloat(avgAirTemp.toFixed(1)),
+          avgTrackTemp: parseFloat(avgTrackTemp.toFixed(1)),
+          avgHumidity: parseFloat(avgHumidity.toFixed(1)),
+          avgWindSpeed: parseFloat(avgWindSpeed.toFixed(1)),
+          avgPressure: parseFloat(avgPressure.toFixed(1)),
+          rainStatus: rainStatus,
+        });
+      } else {
+        setWeatherData(null); // No weather data found
+      }
+      setLoadingWeather(false);
+    };
+
+    fetchWeatherData();
+  }, [selectedRace, supabase]);
 
   useEffect(() => {
     console.log('fetchTelemetry called');
@@ -370,16 +440,18 @@ export default function AnalysisPage() {
         const telemetryToSend = processedTelemetryForTable;
 
         const prompt = `
-          You are an AI Race Engineer. Provide a brief, insightful overview of the driver's performance on this lap based on the following data.
+          You are a world leading expert AI Race Engineer. Provide an insightful overview of the driver's performance on this lap based on the following data.
           Context:
           - Race: ${raceName}
           - Driver: ${driverName}
           - Lap Number: ${selectedLap}
           - Lap Data: ${JSON.stringify(lapData, null, 2)}
+          - Weather Data: ${JSON.stringify(weatherData, null, 2)}
           
           - Telemetry Data: ${JSON.stringify(telemetryToSend, null, 2)}
 
           What are the key takeaways from this lap?
+          Response should be at least 300 words.
         `;
 
         const aiResponse = await generateGeminiResponse(prompt);
@@ -527,6 +599,7 @@ export default function AnalysisPage() {
       - Driver: ${driverName} (ID: ${selectedDriver})
       - Lap Number: ${selectedLap}
       - Lap Data: ${JSON.stringify(lapData, null, 2)}
+      - Weather Data: ${JSON.stringify(weatherData, null, 2)}
 
       - Telemetry Data: ${JSON.stringify(telemetryToSend, null, 2)}
 
@@ -605,8 +678,8 @@ export default function AnalysisPage() {
             </select>
           </div>
         </div>
-      <LapDataDisplay lapData={lapData} />
       <div className={styles.mainGrid}>
+        <WeatherSummaryCard weather={weatherData} loading={loadingWeather} error={errorWeather} />
         <div className={styles.mapContainer}>
           <RaceMap 
             raceLines={raceLinesForMap} 
@@ -889,7 +962,7 @@ export default function AnalysisPage() {
           <div className={styles.aiChatBox}>
             {conversationHistory.map((msg, index) => (
               <div key={index} className={msg.role === 'user' ? styles.userMessage : styles.aiMessage}>
-                {msg.text}
+                {msg.role === 'ai' ? <MarkdownRenderer content={msg.text} /> : msg.text}
               </div>
             ))}
             {isSendingMessage && <div className={styles.aiMessage}>AI is thinking...</div>}
