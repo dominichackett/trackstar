@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import styles from './page.module.css';
@@ -14,12 +14,34 @@ const TrackPageMap = dynamic(() => import('@/components/TrackPageMap'), {
 
 export default function TrackPage() {
   const [selectedTrackId, setSelectedTrackId] = useState<string>(trackData[0].id);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
 
   const handleTrackChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedTrackId(event.target.value);
   };
 
   const selectedTrack = trackData.find(track => track.id === selectedTrackId);
+
+  useEffect(() => {
+    const matchHeight = () => {
+      if (imageContainerRef.current && mapContainerRef.current) {
+        const imageHeight = imageContainerRef.current.offsetHeight;
+        mapContainerRef.current.style.height = `${imageHeight}px`;
+      }
+    };
+
+    // Match height initially and on track change
+    matchHeight();
+
+    // Match height on window resize
+    window.addEventListener('resize', matchHeight);
+
+    // Cleanup event listener
+    return () => {
+      window.removeEventListener('resize', matchHeight);
+    };
+  }, [selectedTrackId]); // Re-run when selectedTrackId changes
 
   if (!selectedTrack) {
     return <div className={styles.container}>Track not found!</div>;
@@ -42,7 +64,7 @@ export default function TrackPage() {
       </div>
 
       <div className={styles.mainGrid}>
-        <div className={styles.mapImageContainer}>
+        <div ref={imageContainerRef} className={styles.mapImageContainer}>
           <h2 className={styles.sectionTitle}>Track Layout</h2>
           <Image
             src={selectedTrack.image}
@@ -54,7 +76,7 @@ export default function TrackPage() {
           />
         </div>
 
-        <div className={styles.mapContainer}>
+        <div ref={mapContainerRef} className={styles.mapContainer}>
           <h2 className={styles.sectionTitle}>Track Location</h2>
           <TrackPageMap 
             position={selectedTrack.finishLineGps} 
