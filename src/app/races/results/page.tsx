@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import styles from './page.module.css';
 import { getSupabaseClient } from '@/utils/supabase/client';
+import WeatherSummaryCard from '@/components/WeatherSummaryCard';
 
 interface Race {
   id: string;
@@ -28,6 +29,15 @@ interface RaceResult {
   created_at: string;
 }
 
+interface WeatherData {
+  avgAirTemp: number | null;
+  avgTrackTemp: number | null;
+  avgHumidity: number | null;
+  avgWindSpeed: number | null;
+  avgPressure: number | null;
+  rainStatus: string; // e.g., "No Rain", "Light Rain", "Heavy Rain"
+}
+
 export default function RaceResultsPage() {
   const supabase = getSupabaseClient();
   const currentYear = new Date().getFullYear();
@@ -36,10 +46,13 @@ export default function RaceResultsPage() {
   const [selectedRace, setSelectedRace] = useState<string>('');
   const [racesList, setRacesList] = useState<Race[]>([]);
   const [raceResults, setRaceResults] = useState<RaceResult[]>([]);
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [loadingRaces, setLoadingRaces] = useState<boolean>(true);
   const [loadingResults, setLoadingResults] = useState<boolean>(false);
+  const [loadingWeather, setLoadingWeather] = useState<boolean>(false);
   const [errorRaces, setErrorRaces] = useState<string | null>(null);
   const [errorResults, setErrorResults] = useState<string | null>(null);
+  const [errorWeather, setErrorWeather] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRaces = async () => {
@@ -99,7 +112,60 @@ export default function RaceResultsPage() {
       setLoadingResults(false);
     };
 
+    const fetchWeatherData = async () => {
+      if (!selectedRace) {
+        setWeatherData(null);
+        return;
+      }
+
+      setLoadingWeather(true);
+      setErrorWeather(null);
+
+      const { data, error } = await supabase
+        .from('weather')
+        .select('air_temp, track_temp, humidity, wind_speed, rain, pressure')
+        .eq('race_id', selectedRace)
+        .order('time_utc_seconds', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching weather data:', error);
+        setErrorWeather(error.message);
+        setWeatherData(null);
+      } else if (data && data.length > 0) {
+        const totalAirTemp = data.reduce((sum, row) => sum + row.air_temp, 0);
+        const totalTrackTemp = data.reduce((sum, row) => sum + row.track_temp, 0);
+        const totalHumidity = data.reduce((sum, row) => sum + row.humidity, 0);
+        const totalWindSpeed = data.reduce((sum, row) => sum + row.wind_speed, 0);
+        const totalRain = data.reduce((sum, row) => sum + row.rain, 0);
+        const totalPressure = data.reduce((sum, row) => sum + row.pressure, 0);
+
+        const avgAirTemp = totalAirTemp / data.length;
+        const avgTrackTemp = totalTrackTemp / data.length;
+        const avgHumidity = totalHumidity / data.length;
+        const avgWindSpeed = totalWindSpeed / data.length;
+        const avgPressure = totalPressure / data.length;
+
+        let rainStatus = 'No Rain';
+        if (totalRain > 0) {
+          rainStatus = totalRain === data.length ? 'Constant Rain' : 'Intermittent Rain';
+        }
+
+        setWeatherData({
+          avgAirTemp: parseFloat(avgAirTemp.toFixed(1)),
+          avgTrackTemp: parseFloat(avgTrackTemp.toFixed(1)),
+          avgHumidity: parseFloat(avgHumidity.toFixed(1)),
+          avgWindSpeed: parseFloat(avgWindSpeed.toFixed(1)),
+          avgPressure: parseFloat(avgPressure.toFixed(1)),
+          rainStatus: rainStatus,
+        });
+      } else {
+        setWeatherData(null); // No weather data found
+      }
+      setLoadingWeather(false);
+    };
+
     fetchRaceResults();
+    fetchWeatherData();
   }, [selectedRace, supabase]);
 
   return (
@@ -142,6 +208,7 @@ export default function RaceResultsPage() {
         </select>
       </div>
       <h1 className={styles.title}>Race Results</h1>
+      <WeatherSummaryCard weather={weatherData} loading={loadingWeather} error={errorWeather} />
       {errorResults && <p className={styles.error}>Error: {errorResults}</p>}
       {loadingResults ? (
         <p>Loading race results...</p>

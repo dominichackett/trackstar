@@ -19,6 +19,10 @@ CREATE POLICY "Users can view their own profile." ON public.profiles
 CREATE POLICY "Users can update their own profile." ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
 
+-- Policy to allow users to insert their own profile
+CREATE POLICY "Users can insert their own profile." ON public.profiles
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
 -- Optional: Trigger to automatically create a profile for new users
 -- This function and trigger would typically be set up in Supabase's SQL editor
 /*

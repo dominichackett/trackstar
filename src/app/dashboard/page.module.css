@@ -102,27 +102,58 @@
 }
 
 .raceCard, .driverCard {
-  background-color: #1a1a1a;
+  background-color: #1a1a1a; /* Fallback */
+  background-image: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
   padding: 1.5rem;
-  border-radius: 8px;
+  border-radius: 12px; /* Slightly more rounded */
   border: 1px solid #333;
-  transition: transform 0.2s ease-in-out, border-color 0.2s ease-in-out;
+  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.raceCard:nth-child(3n+1) {
+  background-image: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
+}
+
+.raceCard:nth-child(3n+2) {
+  background-image: linear-gradient(135deg, #3a3a3a 0%, #4a4a4a 100%);
+}
+
+.raceCard:nth-child(3n+3) {
+  background-image: linear-gradient(135deg, #4a4a4a 0%, #5a5a5a 100%);
+}
+
+.driverCard:nth-child(3n+1) {
+  background-image: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
+}
+
+.driverCard:nth-child(3n+2) {
+  background-image: linear-gradient(135deg, #3a3a3a 0%, #4a4a4a 100%);
+}
+
+.driverCard:nth-child(3n+3) {
+  background-image: linear-gradient(135deg, #4a4a4a 0%, #5a5a5a 100%);
 }
 
 .raceCard:hover, .driverCard:hover {
-  transform: translateY(-5px);
+  transform: translateY(-8px); /* More pronounced lift */
   border-color: var(--trackstar-red);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
 }
 
 .raceCard h3, .driverCard h4 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
+  font-size: 1.3rem; /* Slightly larger */
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+  color: var(--trackstar-white); /* Ensure good contrast */
 }
 
 .raceCard p, .driverCard p {
-  color: #aaa;
-  margin-bottom: 0.2rem;
+  color: #bbb; /* Lighter for better contrast */
+  margin-bottom: 0.3rem;
+  font-size: 0.95rem;
 }
 
 .driverCard {

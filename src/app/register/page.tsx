@@ -30,7 +30,7 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -40,6 +40,16 @@ export default function RegisterPage() {
 
       if (error) {
         throw error;
+      }
+
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([{ id: data.user.id, email: data.user.email }]);
+
+        if (profileError) {
+          throw profileError;
+        }
       }
 
       console.log('User registered:', email);

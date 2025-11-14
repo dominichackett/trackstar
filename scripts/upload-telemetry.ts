@@ -9,9 +9,6 @@ dotenv.config();
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
-console.log('Supabase URL:', supabaseUrl ? 'Loaded' : 'Not Loaded');
-console.log('Supabase Service Key:', supabaseServiceKey ? 'Loaded' : 'Not Loaded');
-
 if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error('Supabase URL and service key must be provided in the .env file.');
 }
@@ -121,10 +118,8 @@ const main = async () => {
       if (!row.vehicle_number || row.vehicle_number === '0') return; // Skip rows with no vehicle number or vehicle number 0
 
       const currentVehicleNumber = parseInt(row.vehicle_number, 10); // Added variable for clarity
-      console.log(`Processing vehicle number: ${currentVehicleNumber}`); // Added log
 
       let driver = drivers.get(currentVehicleNumber);
-      console.log(`Driver found for ${currentVehicleNumber}:`, driver ? 'Yes' : 'No'); // Added log
 
       if (!driver) {
         console.warn(`Driver with number ${currentVehicleNumber} not found. Inserting new driver.`);
@@ -138,11 +133,9 @@ const main = async () => {
           return;
         }
         const newlyInsertedDriver = insertedDrivers[0];
-        console.log('Newly inserted driver from Supabase:', newlyInsertedDriver); // Added log
 
         // Add the new driver to the local drivers map
         drivers.set(newlyInsertedDriver.number, newlyInsertedDriver);
-        console.log('Drivers map after adding new driver:', Array.from(drivers.values()).map((d: Driver) => ({ id: d.id, number: d.number }))); // Adjusted log
         driver = newlyInsertedDriver; // Set the current driver to the newly created one
       }
 
