@@ -221,8 +221,10 @@
   gap: 1rem;
 }
 
-.activePage {
-  background-color: var(--trackstar-red-dark);
+.button.activePage {
+  background-color: #4CAF50; /* A shade of green */
+  color: var(--trackstar-white);
+  font-weight: bold;
 }
 
 .pageInput {
