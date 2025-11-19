@@ -69,9 +69,7 @@ export default function Navbar() {
             <Link href="/track" className={`${styles.navLink} ${pathname === '/track' ? styles.active : ''}`}>
               Tracks
             </Link>
-            <Link href="/ai-chat" className={`${styles.navLink} ${pathname === '/ai-chat' ? styles.active : ''}`}>
-              AI Chat
-            </Link>
+           
             <Link href="/settings" className={`${styles.navLink} ${pathname === '/settings' ? styles.active : ''}`}>
               Settings
             </Link>

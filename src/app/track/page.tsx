@@ -3,9 +3,11 @@
 import { useState, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import styles from './page.module.css';
 import 'leaflet/dist/leaflet.css';
 import { trackData, Track } from '@/lib/track-data';
+import { getSupabaseClient } from '@/utils/supabase/client';
 
 const TrackPageMap = dynamic(() => import('@/components/TrackPageMap'), {
   ssr: false,
@@ -16,6 +18,19 @@ export default function TrackPage() {
   const [selectedTrackId, setSelectedTrackId] = useState<string>(trackData[0].id);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const supabase = getSupabaseClient();
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/');
+      }
+    };
+
+    checkUser();
+  }, [router, supabase]);
 
   const handleTrackChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedTrackId(event.target.value);

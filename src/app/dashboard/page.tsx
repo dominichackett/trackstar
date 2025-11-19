@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import styles from './page.module.css';
 import { getSupabaseClient } from '@/utils/supabase/client';
 
@@ -28,6 +29,18 @@ export default function Dashboard() {
   const [loadingRaces, setLoadingRaces] = useState(true);
   const [loadingDrivers, setLoadingDrivers] = useState(true);
   const supabase = getSupabaseClient();
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/');
+      }
+    };
+
+    checkUser();
+  }, [router, supabase]);
 
   useEffect(() => {
     const fetchRaces = async () => {
@@ -155,7 +168,6 @@ export default function Dashboard() {
       <main className={styles.mainContent}>
         <header className={styles.header}>
           <h1 className={styles.title}>Dashboard</h1>
-          <button className={styles.newAnalysisButton}>+ New Analysis</button>
         </header>
 
         <section className={styles.section}>

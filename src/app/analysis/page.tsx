@@ -3,6 +3,7 @@
 import { useState, useEffect ,Fragment} from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import styles from './page.module.css';
 import 'leaflet/dist/leaflet.css';
@@ -111,6 +112,18 @@ export default function AnalysisPage() {
   const [initialAnalysisDone, setInitialAnalysisDone] = useState<boolean>(false);
   const [lapData, setLapData] = useState<any>(null);
   const [selectedDataPoints, setSelectedDataPoints] = useState<string[]>([]);
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/');
+      }
+    };
+
+    checkUser();
+  }, [router, supabase]);
 
   useEffect(() => {
     const fetchRaces = async () => {

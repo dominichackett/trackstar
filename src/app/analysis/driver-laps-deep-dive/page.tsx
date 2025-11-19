@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { getSupabaseClient } from '@/utils/supabase/client';
 import styles from './page.module.css'; // Assuming a new CSS module for this page
 import StatusIndicator from '@/components/StatusIndicator';
@@ -127,9 +127,13 @@ const generateGeminiResponse = async (prompt: string): Promise<string> => {
   }
 };
 
-export default function DriverLapsDeepDivePage() {
+export default function DriverLapsDeepDivePage({
+  searchParams,
+}: {
+  searchParams: { raceId: string; driverId: string };
+}) {
+  const router = useRouter();
   const supabase = getSupabaseClient();
-  const searchParams = useSearchParams();
 
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [availableYears, setAvailableYears] = useState<string[]>([]);
@@ -138,8 +142,8 @@ export default function DriverLapsDeepDivePage() {
   const [selectedDriverId, setSelectedDriverId] = useState<string>('');
   const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
 
-  const initialRaceId = searchParams.get('raceId');
-  const initialDriverId = searchParams.get('driverId');
+  const initialRaceId = searchParams.raceId;
+  const initialDriverId = searchParams.driverId;
 
   const [allLapsData, setAllLapsData] = useState<LapData[] | null>(null);
   const [driverInfo, setDriverInfo] = useState<Driver | null>(null);
@@ -155,6 +159,7 @@ export default function DriverLapsDeepDivePage() {
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [loadingWeather, setLoadingWeather] = useState<boolean>(false);
   const [errorWeather, setErrorWeather] = useState<string | null>(null);
+  const [telemetryData, setTelemetryData] = useState<any[] | null>(null);
 
   // AI Race Engineer states
   const [aiInsights, setAiInsights] = useState<string | null>(null);
@@ -333,6 +338,17 @@ export default function DriverLapsDeepDivePage() {
 
         if (driverError) throw driverError;
         setDriverInfo(driver);
+
+        // Fetch Telemetry Data for the given driver and race
+        const { data: telemetry, error: telemetryError } = await supabase
+          .from('telemetry')
+          .select('*')
+          .eq('race_id', selectedRaceId)
+          .eq('driver_id', selectedDriverId)
+          .order('timestamp', { ascending: true });
+
+        if (telemetryError) throw telemetryError;
+        setTelemetryData(telemetry);
 
         // Fetch All Laps for the given driver and race
         const { data: allLaps, error: allLapsError } = await supabase
@@ -617,7 +633,7 @@ export default function DriverLapsDeepDivePage() {
       const newSearchParams = new URLSearchParams();
       newSearchParams.set('raceId', selectedRaceId);
       newSearchParams.set('driverId', selectedDriverId);
-      window.history.pushState(null, '', `?${newSearchParams.toString()}`);
+      router.push(`?${newSearchParams.toString()}`);
       // The useEffect for fetchData will re-run due to selectedRaceId and selectedDriverId changing
     } else {
       setError('Please select a race and a driver.');
@@ -638,7 +654,8 @@ export default function DriverLapsDeepDivePage() {
     const context = `Current conversation: ${conversationHistory.map(msg => `${msg.role}: ${msg.text}`).join('\n')}\nUser: ${newUserMessage.text}`;
     const prompt = `You are an expert race engineer analyzing driver performance.
     Here is the data for driver ${driverInfo?.name} (${driverInfo?.number}) in race ${raceInfo?.name}:
-    ${JSON.stringify(allLapsData, null, 2)}
+    Laps Data: ${JSON.stringify(allLapsData, null, 2)}
+    Telemetry Data: ${JSON.stringify(telemetryData, null, 2)}
     Weather Summary: ${JSON.stringify(weatherData, null, 2)}
 
     Based on the provided data and the conversation history, answer the user's question: "${newUserMessage.text}".

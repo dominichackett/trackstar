@@ -8,3 +8,5 @@ CREATE TABLE telemetry (
     value float,
     created_at timestamptz DEFAULT now()
 );
+
+CREATE INDEX idx_telemetry_race_driver_timestamp ON telemetry (race_id, driver_id, timestamp);

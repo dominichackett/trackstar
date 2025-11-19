@@ -48,7 +48,7 @@ export default function SettingsPage() {
         }
       } else {
         // Redirect to login if no user is found
-        router.push('/login');
+        router.push('/');
       }
       setLoading(false);
     };

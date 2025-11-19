@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import styles from './page.module.css';
 import { getSupabaseClient } from '@/utils/supabase/client';
 import WeatherSummaryCard from '@/components/WeatherSummaryCard';
@@ -53,6 +54,18 @@ export default function RaceResultsPage() {
   const [errorRaces, setErrorRaces] = useState<string | null>(null);
   const [errorResults, setErrorResults] = useState<string | null>(null);
   const [errorWeather, setErrorWeather] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/');
+      }
+    };
+
+    checkUser();
+  }, [router, supabase]);
 
   useEffect(() => {
     const fetchRaces = async () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { getSupabaseClient } from '@/utils/supabase/client';
 import styles from './page.module.css';
 import StatusIndicator from '@/components/StatusIndicator';
@@ -163,9 +163,13 @@ const generateGeminiResponse = async (prompt: string): Promise<string> => {
   }
 };
 
-export default function LapDeepDivePage() {
+export default function LapDeepDivePage({
+  searchParams,
+}: {
+  searchParams: { raceId: string; lapNumber: string };
+}) {
+  const router = useRouter();
   const supabase = getSupabaseClient();
-  const searchParams = useSearchParams();
 
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [availableYears, setAvailableYears] = useState<string[]>([]);
@@ -174,8 +178,8 @@ export default function LapDeepDivePage() {
   const [inputLapNumber, setInputLapNumber] = useState<string>('');
   const [availableLapNumbers, setAvailableLapNumbers] = useState<number[]>([]);
 
-  const initialRaceId = searchParams.get('raceId');
-  const initialLapNumber = searchParams.get('lapNumber');
+  const initialRaceId = searchParams.raceId;
+  const initialLapNumber = searchParams.lapNumber;
 
   const [allLapsData, setAllLapsData] = useState<DisplayLapData[] | null>(null);
   const [raceWinnerInfo, setRaceWinnerInfo] = useState<RaceResult | null>(null);
@@ -646,7 +650,7 @@ export default function LapDeepDivePage() {
       const newSearchParams = new URLSearchParams();
       newSearchParams.set('raceId', selectedRaceId);
       newSearchParams.set('lapNumber', inputLapNumber);
-      window.history.pushState(null, '', `?${newSearchParams.toString()}`);
+      router.push(`?${newSearchParams.toString()}`);
       // The useEffect for fetchData will re-run due to selectedRaceId and inputLapNumber changing
     } else {
       setError('Please select a race and enter a lap number.');
